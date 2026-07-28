@@ -164,7 +164,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: brandGreen.withOpacity(0.2),
+                            color: brandGreen.withValues(alpha: 0.2),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -249,9 +249,11 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: color == brandGreen ? color.withOpacity(0.05) : Colors.white,
+        color: color == brandGreen
+            ? color.withValues(alpha: 0.05)
+            : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
       ),
       child: Row(
         children: [
@@ -306,7 +308,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
             Container(
               width: 64,
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.05),
+                color: iconColor.withValues(alpha: 0.05),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(23), // Adjusted for border alignment
                   bottomLeft: Radius.circular(23),
@@ -349,7 +351,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                               width: 5,
                               height: 5,
                               decoration: BoxDecoration(
-                                color: iconColor.withOpacity(0.5),
+                                color: iconColor.withValues(alpha: 0.5),
                                 shape: BoxShape.circle,
                               ),
                             ),

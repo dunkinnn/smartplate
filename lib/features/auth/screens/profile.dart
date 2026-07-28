@@ -57,17 +57,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (context) => PreferencesScreen(
-              profileData: {
-                'full_name': fullNameController.text.trim(),
-                'phone': phoneController.text.trim(),
-                'age': int.tryParse(ageController.text.trim()),
-                'gender': selectedGender,
-                'height_cm': double.tryParse(selectedHeight!),
-                'weight_kg': double.tryParse(selectedWeight!),
-              },
-            ),
+        builder: (context) => PreferencesScreen(
+          profileData: {
+            'full_name': fullNameController.text.trim(),
+            'phone': phoneController.text.trim(),
+            'age': int.tryParse(ageController.text.trim()),
+            'gender': selectedGender,
+            'height_cm': double.tryParse(selectedHeight!),
+            'weight_kg': double.tryParse(selectedWeight!),
+          },
+        ),
       ),
     );
   }
@@ -84,7 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Step 1 of 4 – Personal Information',
+          'Step 1 of 4 - Personal Information',
           style: TextStyle(
             color: Color(0xFF334155),
             fontSize: 16,
@@ -169,8 +168,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         hint: 'Select',
                         value: selectedGender,
                         items: genderOptions,
-                        onChanged:
-                            (val) => setState(() => selectedGender = val),
+                        onChanged: (val) =>
+                            setState(() => selectedGender = val),
                       ),
                     ],
                   ),
@@ -290,13 +289,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             hint,
             style: const TextStyle(color: Colors.blueGrey, fontSize: 14),
           ),
-          items:
-              items
-                  .map(
-                    (String val) =>
-                        DropdownMenuItem<String>(value: val, child: Text(val)),
-                  )
-                  .toList(),
+          items: items
+              .map(
+                (String val) =>
+                    DropdownMenuItem<String>(value: val, child: Text(val)),
+              )
+              .toList(),
           onChanged: onChanged,
           icon: Row(
             mainAxisSize: MainAxisSize.min,

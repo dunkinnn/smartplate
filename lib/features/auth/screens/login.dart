@@ -84,11 +84,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final user = response.user;
 
-      if (user != null && mounted) {
+      if (user != null) {
         // Handle saving/clearing credentials
         final prefs = await SharedPreferences.getInstance();
+
         await prefs.setBool('save_password', _savePassword);
-        
+
         if (_savePassword) {
           await prefs.setString('saved_email', _userController.text.trim());
           await prefs.setString('saved_password', _passController.text.trim());
@@ -97,9 +98,11 @@ class _LoginScreenState extends State<LoginScreen> {
           await prefs.remove('saved_password');
         }
 
+        if (!mounted) return;
+
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const DashboardScreen()),
+          MaterialPageRoute(builder: (_) => const DashboardScreen()),
         );
       } else {
         if (mounted) {
@@ -112,11 +115,15 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _authError = 'Something went wrong. Please try again.');
+        setState(() {
+          _authError = 'Something went wrong. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
       }
     }
-
-    if (mounted) setState(() => isLoading = false);
   }
 
   @override
@@ -178,15 +185,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: errorRed, size: 18),
+                      const Icon(
+                        Icons.error_outline,
+                        color: errorRed,
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _authError!,
-                          style: const TextStyle(
-                            color: errorRed,
-                            fontSize: 13,
-                          ),
+                          style: const TextStyle(color: errorRed, fontSize: 13),
                         ),
                       ),
                     ],
@@ -194,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
 
               _buildTextField(
-                hint: "Email", 
+                hint: "Email",
                 controller: _userController,
                 error: _emailError,
                 onClearError: () => setState(() => _emailError = null),

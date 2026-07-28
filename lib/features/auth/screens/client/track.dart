@@ -164,7 +164,7 @@ class _TrackScreenState extends State<TrackScreen> {
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: brandGreen.withOpacity(0.2),
+                            color: brandGreen.withValues(alpha: 0.2),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -195,7 +195,7 @@ class _TrackScreenState extends State<TrackScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: darkBlue.withOpacity(0.2),
+            color: darkBlue.withValues(alpha: 0.2),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -213,7 +213,7 @@ class _TrackScreenState extends State<TrackScreen> {
                   value: 0.66,
                   strokeWidth: 10,
                   color: brandGreen,
-                  backgroundColor: Colors.white.withOpacity(0.1),
+                  backgroundColor: Colors.white.withValues(alpha: 0.1),
                   strokeCap: StrokeCap.round,
                 ),
               ),
@@ -263,7 +263,7 @@ class _TrackScreenState extends State<TrackScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: brandGreen.withOpacity(0.2),
+                    color: brandGreen.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Text(

@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/screens/login.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   final VoidCallback onBack;
-
   const ProfileScreen({super.key, required this.onBack});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  late final SupabaseClient _supabase;
+  String userName = "User";
+  String userEmail = "";
+  String? profileImageUrl;
 
   // Color Palette
   static const Color brandGreen = Color(0xFF67A75F);
@@ -12,6 +22,60 @@ class ProfileScreen extends StatelessWidget {
   static const Color textSecondary = Color(0xFF64748B);
   static const Color borderColor = Color(0xFFE2E8F0);
   static const Color bgGray = Color(0xFFF8FAFC);
+
+  @override
+  void initState() {
+    super.initState();
+    _supabase = Supabase.instance.client;
+
+    // Show user email immediately from auth
+    final user = _supabase.auth.currentUser;
+    if (user != null) {
+      setState(() {
+        userEmail = user.email ?? "No email";
+        userName =
+            user.userMetadata?['full_name'] ??
+            user.email?.split('@')[0] ??
+            "User";
+      });
+    }
+
+    // Fetch additional data in background (optional)
+    _fetchUserDataOptimized();
+  }
+
+  Future<void> _fetchUserDataOptimized() async {
+    try {
+      final user = _supabase.auth.currentUser;
+
+      if (user != null) {
+        // Only fetch if we need extra data from profiles table
+        final response = await _supabase
+            .from('profiles')
+            .select('full_name, avatar_url')
+            .eq('id', user.id)
+            .single()
+            .timeout(
+              const Duration(seconds: 3), // Max 3 seconds timeout
+              onTimeout: () => {'full_name': null, 'avatar_url': null},
+            );
+
+        if (mounted) {
+          setState(() {
+            if (response['full_name'] != null) {
+              userName = response['full_name'];
+            }
+            if (response['avatar_url'] != null) {
+              profileImageUrl = response['avatar_url'];
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching profile data: $e");
+      // Silently fail - we already have user email from auth
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +90,7 @@ class ProfileScreen extends StatelessWidget {
             color: darkBlue,
             size: 20,
           ),
-          onPressed: onBack,
+          onPressed: widget.onBack,
         ),
         title: const Text(
           "Profile Settings",
@@ -46,7 +110,6 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 10),
             _buildUserHeader(),
             const SizedBox(height: 30),
-
             // Account Group
             _buildSectionHeader("ACCOUNT"),
             _buildSettingsGroup([
@@ -64,11 +127,10 @@ class ProfileScreen extends StatelessWidget {
                 Icons.notifications_none_rounded,
                 "Notifications",
                 "Alerts & Reminders",
+                isLast: true,
               ),
             ]),
-
             const SizedBox(height: 25),
-
             // Health Group
             _buildSectionHeader("HEALTH & GOALS"),
             _buildSettingsGroup([
@@ -82,26 +144,23 @@ class ProfileScreen extends StatelessWidget {
                 Icons.track_changes_rounded,
                 "Nutritional Goals",
                 "Weight loss, Muscle gain",
+                isLast: true,
               ),
             ]),
-
             const SizedBox(height: 40),
-
             // Logout
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: TextButton(
-                onPressed: () {
-                  // 1. Clear user session/token logic here if needed
+                onPressed: () async {
+                  await _supabase.auth.signOut();
 
-                  // 2. Redirect to Login and clear the navigation stack
+                  if (!mounted) return;
+
                   Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ), // Ensure LoginScreen is imported
-                    (route) =>
-                        false, // This removes all previous routes from the stack
+                    this.context,
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
                   );
                 },
                 style: TextButton.styleFrom(
@@ -144,7 +203,7 @@ class ProfileScreen extends StatelessWidget {
         border: Border.all(color: borderColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -155,10 +214,13 @@ class ProfileScreen extends StatelessWidget {
           Stack(
             alignment: Alignment.bottomRight,
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 38,
                 backgroundColor: bgGray,
-                backgroundImage: AssetImage('assets/images/profile.png'),
+                backgroundImage: profileImageUrl != null
+                    ? NetworkImage(profileImageUrl!)
+                    : const AssetImage('assets/images/profile.png')
+                          as ImageProvider,
               ),
               Container(
                 padding: const EdgeInsets.all(4),
@@ -180,31 +242,21 @@ class ProfileScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "Jemimah Jimenez",
-                  style: TextStyle(
+                Text(
+                  userName,
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     color: darkBlue,
                     letterSpacing: -0.5,
                   ),
                 ),
-                const Text(
-                  "Pro Member",
-                  style: TextStyle(
-                    color: brandGreen,
+                Text(
+                  userEmail,
+                  style: const TextStyle(
+                    color: textSecondary,
                     fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: const LinearProgressIndicator(
-                    value: 0.8,
-                    backgroundColor: borderColor,
-                    color: brandGreen,
-                    minHeight: 5,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -283,7 +335,9 @@ class ProfileScreen extends StatelessWidget {
             color: borderColor,
             size: 14,
           ),
-          onTap: () {},
+          onTap: () {
+            // Add navigation logic here
+          },
         ),
         if (!isLast) const Divider(height: 1, indent: 70, color: borderColor),
       ],

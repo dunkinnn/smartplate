@@ -206,7 +206,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: brandGreen.withOpacity(0.3),
+                            color: brandGreen.withValues(alpha: 0.3),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -261,7 +261,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
       decoration: BoxDecoration(
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
@@ -365,7 +365,10 @@ class _LogMealScreenState extends State<LogMealScreen> {
         height: 55,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: brandGreen.withOpacity(0.5), width: 1.5),
+          border: Border.all(
+            color: brandGreen.withValues(alpha: 0.5),
+            width: 1.5,
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

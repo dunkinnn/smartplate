@@ -206,7 +206,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
             ? []
             : [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
+                  color: Colors.black.withValues(alpha: 0.02),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -242,7 +242,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
             style: TextStyle(
               fontSize: 13,
               color: item.isBought
-                  ? textSecondary.withOpacity(0.5)
+                  ? textSecondary.withValues(alpha: 0.5)
                   : textSecondary,
               fontWeight: FontWeight.w500,
             ),
@@ -251,8 +251,8 @@ class _GroceryScreenState extends State<GroceryScreen> {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: item.isBought
-                  ? Colors.white.withOpacity(0.5)
-                  : brandGreen.withOpacity(0.08),
+                  ? Colors.white.withValues(alpha: 0.5)
+                  : brandGreen.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -291,7 +291,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
                 darkBlue, // Changed to Dark Blue for "Executive" feel
             foregroundColor: Colors.white,
             elevation: 8,
-            shadowColor: darkBlue.withOpacity(0.4),
+            shadowColor: darkBlue.withValues(alpha: 0.4),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
             ),
@@ -326,7 +326,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
                 height: 80,
                 width: 80,
                 decoration: BoxDecoration(
-                  color: brandGreen.withOpacity(0.1),
+                  color: brandGreen.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(

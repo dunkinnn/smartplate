@@ -114,7 +114,9 @@ class NotificationScreen extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
             // Minimalist unread indicator using subtle background tint
-            color: isUnread ? brandGreen.withOpacity(0.05) : Colors.transparent,
+            color: isUnread
+                ? brandGreen.withValues(alpha: 0.05)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
           child: InkWell(

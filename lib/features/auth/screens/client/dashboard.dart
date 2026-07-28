@@ -18,10 +18,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const Color brandGreen = Color(0xFF67A75F);
   static const Color darkBlue = Color(0xFF1E293B); // Refined dark blue
   static const Color textSecondary = Color(0xFF64748B);
-  static const Color borderColor = Color(
-    0xFFE2E8F0,
-  ); 
-  
+  static const Color borderColor = Color(0xFFE2E8F0);
+
   late final List<Widget> _pages;
 
   @override
@@ -333,12 +331,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         color: darkBlue,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           width: 1,
         ), // 1px border for dark card
         boxShadow: [
           BoxShadow(
-            color: darkBlue.withOpacity(0.2),
+            color: darkBlue.withValues(alpha: 0.2),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -433,7 +431,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             height: 48,
             width: 48,
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.1),
+              color: accentColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(icon, color: accentColor, size: 22),
@@ -492,9 +490,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       border: Border.all(color: borderColor, width: 1),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(
-            0.02,
-          ), // Lightened shadow because the border now does the heavy lifting
+          // Lightened shadow because the border now does the heavy lifting
+          color: Colors.black.withValues(alpha: 0.02),
           blurRadius: 10,
           offset: const Offset(0, 4),
         ),
