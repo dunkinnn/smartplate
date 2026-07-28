@@ -58,7 +58,8 @@ class _SignupScreenState extends State<SignupScreen> {
       if (password.isEmpty) {
         _passwordError = 'Password is required.';
       } else if (!isStrongPassword(password)) {
-        _passwordError = 'Weak password! Example: Angelou@24';
+        _passwordError =
+            'Password must contain at least 8 characters, including an uppercase letter, a lowercase letter, a number, and a special character.';
       } else {
         _passwordError = null;
       }
