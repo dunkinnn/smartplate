@@ -216,25 +216,9 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
             onPressed: () => Navigator.pop(context),
           ),
           const Expanded(
-            child: Column(
-              children: [
-                Text(
-                  "Custom Food",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: darkBlue,
-                  ),
-                ),
-                Text(
-                  "Add your own recipe",
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            child: HeaderTitle(
+              title: "Custom Food",
+              subtitle: "Add your own recipe",
             ),
           ),
           IconButton(
@@ -253,6 +237,7 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
               );
             },
           ),
+          const SizedBox(width: 8), // Balances the leading spacer
         ],
       ),
     );

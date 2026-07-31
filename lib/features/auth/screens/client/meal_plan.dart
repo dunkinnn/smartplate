@@ -185,27 +185,11 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     return GlassHeader(
       child: Row(
         children: [
-          const SizedBox(width: 48), // Spacer for centering
+          const SizedBox(width: 56), // Matches trailing icon plus padding
           const Expanded(
-            child: Column(
-              children: [
-                Text(
-                  "Meal",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: darkBlue,
-                  ),
-                ),
-                Text(
-                  "AI-generated meal plan",
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            child: HeaderTitle(
+              title: "Meal",
+              subtitle: "AI-generated meal plan",
             ),
           ),
           IconButton(

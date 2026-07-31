@@ -314,27 +314,11 @@ class _GroceryScreenState extends State<GroceryScreen> {
     return GlassHeader(
       child: Row(
         children: [
-          const SizedBox(width: 48), // Spacer for centering
+          const SizedBox(width: 56), // Matches trailing icon plus padding
           const Expanded(
-            child: Column(
-              children: [
-                Text(
-                  "Grocery",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: darkBlue,
-                  ),
-                ),
-                Text(
-                  "From your meal plan",
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            child: HeaderTitle(
+              title: "Grocery",
+              subtitle: "From your meal plan",
             ),
           ),
           IconButton(

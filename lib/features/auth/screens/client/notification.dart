@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
 // An alert derived from the user's own logs, not stored server side.
 class AppNotification {
@@ -274,7 +275,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   right: 16,
                   bottom: 12,
                   // Clear the transparent app bar.
-                  top: MediaQuery.of(context).padding.top + kToolbarHeight + 12,
+                  top: MediaQuery.of(context).padding.top + 64 + 12,
                 ),
                 children: _notifications
                     .map(
@@ -294,6 +295,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
       backgroundColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
+      // Matches GlassHeader so titles line up across every client screen.
+      toolbarHeight: 64,
       // Frosted glass, matching the other client screens.
       flexibleSpace: ClipRect(
         child: BackdropFilter(
@@ -321,44 +324,28 @@ class _NotificationScreenState extends State<NotificationScreen> {
         onPressed: widget.onBackToHome,
       ),
       centerTitle: true,
-      title: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Text(
-            "Notifications",
-            style: TextStyle(
-              color: Color(0xFF1E293B),
-              fontSize: 18,
-              fontWeight:
-                  FontWeight.w900, // Matching the 'Performance' header weight
-              letterSpacing: -0.5,
-            ),
-          ),
-          Text(
-            "Alerts and reminders based on your activity.",
-            style: TextStyle(
-              color: Color(0xFF64748B),
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+      title: const HeaderTitle(
+        title: "Notifications",
+        subtitle: "Alerts based on your activity",
       ),
+      // An icon rather than a text button, so the trailing width always
+      // matches the leading back button and the title stays truly centred.
       actions: [
-        if (unreadCount > 0)
-          TextButton(
-            onPressed: _markAllRead,
-            child: const Text(
-              "Read all",
-              style: TextStyle(
-                color: brandGreen,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-              ),
-            ),
-          )
-        else
-          const SizedBox(width: 56),
+        SizedBox(
+          width: 48,
+          child: unreadCount > 0
+              ? IconButton(
+                  tooltip: 'Mark all as read',
+                  onPressed: _markAllRead,
+                  icon: const Icon(
+                    Icons.done_all_rounded,
+                    color: brandGreen,
+                    size: 20,
+                  ),
+                )
+              : null,
+        ),
+        const SizedBox(width: 8),
       ],
     );
   }

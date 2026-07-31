@@ -189,27 +189,11 @@ class _InsightsScreenState extends State<InsightsScreen> {
     return GlassHeader(
       child: Row(
         children: [
-          const SizedBox(width: 48), // Spacer for centering
+          const SizedBox(width: 56), // Matches trailing icon plus padding
           const Expanded(
-            child: Column(
-              children: [
-                Text(
-                  "Performance",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: darkBlue,
-                  ),
-                ),
-                Text(
-                  "Weekly Health Performance",
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            child: HeaderTitle(
+              title: "Performance",
+              subtitle: "Weekly Health Performance",
             ),
           ),
           IconButton(

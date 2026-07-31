@@ -3,6 +3,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/screens/login.dart';
+import 'package:smart_plate/features/auth/screens/client/notification.dart';
+import 'package:smart_plate/features/auth/screens/client/settings/dietary_preferences.dart';
+import 'package:smart_plate/features/auth/screens/client/settings/nutritional_goals_settings.dart';
+import 'package:smart_plate/features/auth/screens/client/settings/personal_info.dart';
+import 'package:smart_plate/features/auth/screens/client/settings/security.dart';
+import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onBack;
@@ -19,7 +25,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? profileImageUrl;
 
   // Color Palette
-  static const Color brandGreen = Color(0xFF67A75F);
   static const Color darkBlue = Color(0xFF1E293B);
   static const Color textSecondary = Color(0xFF64748B);
   static const Color borderColor = Color(0xFFE2E8F0);
@@ -88,6 +93,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
+        // Matches GlassHeader so titles line up across every client screen.
+        toolbarHeight: 64,
         // Frosted glass, matching the other client screens.
         flexibleSpace: ClipRect(
           child: BackdropFilter(
@@ -113,14 +120,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           onPressed: widget.onBack,
         ),
-        title: const Text(
-          "Profile Settings",
-          style: TextStyle(
-            color: darkBlue,
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.5,
-          ),
+        title: const HeaderTitle(
+          title: "Profile Settings",
+          subtitle: "Account, health and goals",
         ),
         centerTitle: true,
       ),
@@ -129,9 +131,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           children: [
             // Clear the transparent app bar.
-            SizedBox(
-              height: MediaQuery.of(context).padding.top + kToolbarHeight + 10,
-            ),
+            SizedBox(height: MediaQuery.of(context).padding.top + 64 + 10),
             _buildUserHeader(),
             const SizedBox(height: 30),
             // Account Group
@@ -140,18 +140,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildOptionTile(
                 Icons.person_outline_rounded,
                 "Personal Info",
-                "Name, Email, Photo",
+                "Name, photo, measurements",
+                onTap: () => _open(const PersonalInfoScreen()),
               ),
               _buildOptionTile(
                 Icons.shield_outlined,
                 "Security",
-                "Password and 2FA",
+                "Change your password",
+                onTap: () => _open(const SecurityScreen()),
               ),
               _buildOptionTile(
                 Icons.notifications_none_rounded,
                 "Notifications",
                 "Alerts & Reminders",
                 isLast: true,
+                onTap: () => _open(
+                  NotificationScreen(
+                    onBackToHome: () => Navigator.pop(context),
+                  ),
+                ),
               ),
             ]),
             const SizedBox(height: 25),
@@ -161,14 +168,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildOptionTile(
                 Icons.restaurant_rounded,
                 "Dietary Preferences",
-                "Vegan, Keto, Allergies",
+                "Diet, taste, allergies",
                 isLast: false,
+                onTap: () => _open(const DietaryPreferencesScreen()),
               ),
               _buildOptionTile(
                 Icons.track_changes_rounded,
                 "Nutritional Goals",
-                "Weight loss, Muscle gain",
+                "Calorie target, macros",
                 isLast: true,
+                onTap: () => _open(const NutritionalGoalsSettingsScreen()),
               ),
             ]),
             const SizedBox(height: 40),
@@ -235,31 +244,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Row(
         children: [
-          Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              CircleAvatar(
-                radius: 38,
-                backgroundColor: bgGray,
-                backgroundImage: profileImageUrl != null
-                    ? NetworkImage(profileImageUrl!)
-                    : const AssetImage('assets/images/profile.png')
-                          as ImageProvider,
-              ),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: brandGreen,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: const Icon(
-                  Icons.camera_alt_rounded,
-                  color: Colors.white,
-                  size: 12,
-                ),
-              ),
-            ],
+          CircleAvatar(
+            radius: 38,
+            backgroundColor: bgGray,
+            backgroundImage: profileImageUrl != null
+                ? NetworkImage(profileImageUrl!)
+                : const AssetImage('assets/images/profile.png')
+                      as ImageProvider,
           ),
           const SizedBox(width: 20),
           Expanded(
@@ -321,11 +312,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Reloads on return so an edited name or photo shows immediately.
+  Future<void> _open(Widget screen) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    if (mounted) _fetchUserDataOptimized();
+  }
+
   Widget _buildOptionTile(
     IconData icon,
     String title,
     String subtitle, {
     bool isLast = false,
+    VoidCallback? onTap,
   }) {
     return Column(
       children: [
@@ -359,9 +357,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: borderColor,
             size: 14,
           ),
-          onTap: () {
-            // Add navigation logic here
-          },
+          onTap: onTap,
         ),
         if (!isLast) const Divider(height: 1, indent: 70, color: borderColor),
       ],

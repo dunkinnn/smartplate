@@ -270,25 +270,9 @@ class _LogMealScreenState extends State<LogMealScreen> {
             onPressed: () => Navigator.pop(context),
           ),
           const Expanded(
-            child: Column(
-              children: [
-                Text(
-                  "Log Nutrition",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: darkBlue,
-                  ),
-                ),
-                Text(
-                  "Keep your streak alive",
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            child: HeaderTitle(
+              title: "Log Nutrition",
+              subtitle: "Keep your streak alive",
             ),
           ),
           IconButton(

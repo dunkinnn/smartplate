@@ -156,27 +156,11 @@ class _TrackScreenState extends State<TrackScreen> {
     return GlassHeader(
       child: Row(
         children: [
-          const SizedBox(width: 48), // Spacer for centering
+          const SizedBox(width: 56), // Matches trailing icon plus padding
           const Expanded(
-            child: Column(
-              children: [
-                Text(
-                  "Track",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: darkBlue,
-                  ),
-                ),
-                Text(
-                  "Log meals & monitor nutrition",
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            child: HeaderTitle(
+              title: "Track",
+              subtitle: "Log meals & monitor nutrition",
             ),
           ),
           IconButton(

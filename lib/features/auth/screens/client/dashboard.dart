@@ -243,6 +243,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       elevation: 0,
       scrolledUnderElevation: 0,
       toolbarHeight: 70,
+      // The dashboard is the root of the signed-in app, so no back button.
+      automaticallyImplyLeading: false,
       // Frosted glass: blur whatever scrolls beneath, tinted white so the
       // dark text stays legible, with a hairline edge to separate it.
       flexibleSpace: ClipRect(
