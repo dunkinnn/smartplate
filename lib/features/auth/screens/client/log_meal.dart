@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/models/food_entry.dart';
 import 'package:smart_plate/features/auth/screens/client/custom_food.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
+import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
 class LogMealScreen extends StatefulWidget {
   final DateTime? initialDate;
@@ -22,23 +23,91 @@ class _LogMealScreenState extends State<LogMealScreen> {
   String selectedMealType = "Breakfast";
   bool isSaving = false;
 
+  // Inline message shown above the save button instead of a snackbar.
+  String? _message;
+  bool _messageIsError = true;
+
   // Foods staged for this meal, saved together when the user taps Save.
   final List<FoodEntry> stagedFoods = [];
+
+  // Saved food library, searched by the bar above the list.
+  final searchController = TextEditingController();
+  List<FoodEntry> _savedFoods = [];
+  bool _isSearching = false;
 
   @override
   void initState() {
     super.initState();
     selectedDate = widget.initialDate ?? DateTime.now();
+    _loadSavedFoods();
   }
 
-  int get _totalKcal =>
-      stagedFoods.fold(0, (sum, food) => sum + food.kcal);
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  // Empty query shows the most recently used foods.
+  Future<void> _loadSavedFoods([String query = '']) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    setState(() => _isSearching = true);
+
+    try {
+      var request = Supabase.instance.client
+          .from('custom_foods')
+          .select()
+          .eq('user_id', user.id);
+
+      if (query.trim().isNotEmpty) {
+        request = request.ilike('name', '%${query.trim()}%');
+      }
+
+      final rows = await request
+          .order('last_used_at', ascending: false)
+          .limit(8)
+          .timeout(const Duration(seconds: 10));
+
+      if (!mounted) return;
+      setState(() {
+        _savedFoods = (rows as List)
+            .map((r) => FoodEntry.fromRow(r as Map<String, dynamic>))
+            .toList();
+        _isSearching = false;
+      });
+    } catch (e) {
+      debugPrint('Failed to load saved foods: $e');
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
+  // Adds a saved food to this meal and bumps it up the recents list.
+  Future<void> _addSavedFood(FoodEntry food) async {
+    setState(() {
+      stagedFoods.add(food);
+      searchController.clear();
+      _message = null; // Adding food resolves the "add a food" error.
+    });
+
+    if (food.id == null) return;
+    try {
+      await Supabase.instance.client
+          .from('custom_foods')
+          .update({'last_used_at': DateTime.now().toIso8601String()})
+          .eq('id', food.id!);
+    } catch (e) {
+      debugPrint('Failed to bump food: $e');
+    }
+  }
+
+  int get _totalKcal => stagedFoods.fold(0, (sum, food) => sum + food.kcal);
   double get _totalProtein =>
       stagedFoods.fold(0.0, (sum, food) => sum + food.proteinG);
   double get _totalCarbs =>
       stagedFoods.fold(0.0, (sum, food) => sum + food.carbsG);
-  double get _totalFat =>
-      stagedFoods.fold(0.0, (sum, food) => sum + food.fatG);
+  double get _totalFat => stagedFoods.fold(0.0, (sum, food) => sum + food.fatG);
 
   Future<void> _addCustomFood() async {
     final food = await Navigator.push<FoodEntry>(
@@ -47,68 +116,60 @@ class _LogMealScreenState extends State<LogMealScreen> {
     );
 
     if (food != null && mounted) {
-      setState(() => stagedFoods.add(food));
+      setState(() {
+        stagedFoods.add(food);
+        _message = null;
+      });
+      _loadSavedFoods(searchController.text); // Pick up a newly saved food.
     }
+  }
+
+  void _showMessage(String text, {bool isError = true}) {
+    setState(() {
+      _message = text;
+      _messageIsError = isError;
+    });
   }
 
   Future<void> _saveMealLog() async {
     if (isSaving) return;
 
     if (stagedFoods.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Add at least one food before saving.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      _showMessage('Add at least one food before saving.');
       return;
     }
 
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No user session found. Please log in again.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      _showMessage('No user session found. Please log in again.');
       return;
     }
 
-    setState(() => isSaving = true);
+    setState(() {
+      isSaving = true;
+      _message = null;
+    });
 
     try {
-      await Supabase.instance.client.from('food_logs').insert(
-        stagedFoods
-            .map(
-              (food) => food.toRow(
-                userId: user.id,
-                date: selectedDate,
-                mealType: selectedMealType,
-              ),
-            )
-            .toList(),
-      );
+      await Supabase.instance.client
+          .from('food_logs')
+          .insert(
+            stagedFoods
+                .map(
+                  (food) => food.toRow(
+                    userId: user.id,
+                    date: selectedDate,
+                    mealType: selectedMealType,
+                  ),
+                )
+                .toList(),
+          );
 
       if (mounted) Navigator.pop(context, true);
     } on PostgrestException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not save: ${e.message}'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+      if (mounted) _showMessage(e.message);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+      if (mounted) _showMessage('Something went wrong. Please try again.');
     }
 
     if (mounted) setState(() => isSaving = false);
@@ -118,19 +179,17 @@ class _LogMealScreenState extends State<LogMealScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildAppBar(),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 15),
-                    _buildHorizontalCalendar(),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: GlassHeader.insetFor(context) + 15),
+                _buildHorizontalCalendar(),
                     const SizedBox(height: 30),
 
                     const Text(
@@ -147,6 +206,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
 
                     const SizedBox(height: 25),
                     _buildSearchBar(),
+                    _buildSavedFoodResults(),
 
                     const SizedBox(height: 30),
                     Row(
@@ -182,27 +242,23 @@ class _LogMealScreenState extends State<LogMealScreen> {
                     const SizedBox(height: 12),
                     _buildCustomButton("Add Custom Food", Icons.add_rounded),
 
-                    const SizedBox(height: 35),
-                    _buildSummaryCard(),
-                    const SizedBox(height: 25),
-                    _buildSaveButton(),
-                    const SizedBox(height: 30),
-                  ],
-                ),
-              ),
+                const SizedBox(height: 35),
+                _buildSummaryCard(),
+                _buildMessageBanner(),
+                const SizedBox(height: 25),
+                _buildSaveButton(),
+                const SizedBox(height: 30),
+              ],
             ),
-          ],
-        ),
+          ),
+          _buildAppBar(),
+        ],
       ),
     );
   }
 
   Widget _buildAppBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
-      ),
+    return GlassHeader(
       child: Row(
         children: [
           IconButton(
@@ -348,7 +404,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
     );
   }
 
-  // Search needs a food database, which does not exist yet. Disabled until then.
+  // Searches the user's saved foods.
   Widget _buildSearchBar() {
     return Container(
       decoration: BoxDecoration(
@@ -361,11 +417,22 @@ class _LogMealScreenState extends State<LogMealScreen> {
         ],
       ),
       child: TextField(
-        enabled: false,
+        controller: searchController,
+        onChanged: _loadSavedFoods,
         decoration: InputDecoration(
-          hintText: "Food search coming soon",
+          hintText: "Search your saved foods...",
           hintStyle: const TextStyle(color: textSecondary, fontSize: 14),
           prefixIcon: const Icon(Icons.search_rounded, color: brandGreen),
+          suffixIcon: searchController.text.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  color: textSecondary,
+                  onPressed: () {
+                    searchController.clear();
+                    _loadSavedFoods();
+                  },
+                ),
           filled: true,
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.all(16),
@@ -373,11 +440,115 @@ class _LogMealScreenState extends State<LogMealScreen> {
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
           ),
-          disabledBorder: OutlineInputBorder(
+          enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
           ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: brandGreen, width: 2),
+          ),
         ),
+      ),
+    );
+  }
+
+  // Tappable saved foods, shown as recents until the user types.
+  Widget _buildSavedFoodResults() {
+    if (_isSearching) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: SizedBox(
+            height: 18,
+            width: 18,
+            child: CircularProgressIndicator(color: brandGreen, strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    if (_savedFoods.isEmpty) {
+      if (searchController.text.trim().isEmpty) return const SizedBox.shrink();
+      return const Padding(
+        padding: EdgeInsets.only(top: 14, left: 4),
+        child: Text(
+          "No saved food matches that name.",
+          style: TextStyle(
+            color: textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            searchController.text.trim().isEmpty ? "RECENT" : "MATCHES",
+            style: const TextStyle(
+              color: textSecondary,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _savedFoods
+                .map(
+                  (food) => GestureDetector(
+                    onTap: () => _addSavedFood(food),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: bgLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.add_rounded,
+                            size: 15,
+                            color: brandGreen,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            food.name,
+                            style: const TextStyle(
+                              color: darkBlue,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            "${food.kcal} kcal",
+                            style: const TextStyle(
+                              color: textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
       ),
     );
   }
@@ -573,6 +744,63 @@ class _LogMealScreenState extends State<LogMealScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  // Inline, dismissible, and styled like the rest of the screen. Stays on
+  // screen until resolved rather than disappearing after a few seconds.
+  Widget _buildMessageBanner() {
+    final message = _message;
+    if (message == null) return const SizedBox.shrink();
+
+    final accent = _messageIsError
+        ? const Color(0xFFF25151)
+        : brandGreen;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: accent.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              _messageIsError
+                  ? Icons.error_outline_rounded
+                  : Icons.check_circle_outline_rounded,
+              color: accent,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: accent,
+                  fontSize: 13,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => setState(() => _message = null),
+              child: Icon(
+                Icons.close_rounded,
+                size: 16,
+                color: accent.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/models/food_entry.dart';
 import 'package:smart_plate/features/auth/screens/client/log_meal.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
+import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
 class TrackScreen extends StatefulWidget {
   final VoidCallback onBackToHome;
@@ -106,60 +107,53 @@ class _TrackScreenState extends State<TrackScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildAppBar(),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _loadDay,
-                color: brandGreen,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 15),
-                      _buildHorizontalCalendar(),
-                      const SizedBox(height: 25),
-                      _buildCalorieProgressCard(),
-                      const SizedBox(height: 30),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          RefreshIndicator(
+            onRefresh: _loadDay,
+            color: brandGreen,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  SizedBox(height: GlassHeader.insetFor(context) + 15),
+                  _buildHorizontalCalendar(),
+                  const SizedBox(height: 25),
+                  _buildCalorieProgressCard(),
+                  const SizedBox(height: 30),
 
-                      _buildSectionHeader("DAILY LOGS"),
-                      if (isLoading)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 40),
-                          child: CircularProgressIndicator(color: brandGreen),
-                        )
-                      else
-                        ...mealTypes.map(
-                          (type) => _buildTrackMealCard(
-                            type,
-                            logsByMeal[type] ?? const [],
-                            mealIcons[type]!,
-                          ),
-                        ),
+                  _buildSectionHeader("DAILY LOGS"),
+                  if (isLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 40),
+                      child: CircularProgressIndicator(color: brandGreen),
+                    )
+                  else
+                    ...mealTypes.map(
+                      (type) => _buildTrackMealCard(
+                        type,
+                        logsByMeal[type] ?? const [],
+                        mealIcons[type]!,
+                      ),
+                    ),
 
-                      const SizedBox(height: 30),
-                    ],
-                  ),
-                ),
+                  const SizedBox(height: 30),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          _buildAppBar(),
+        ],
       ),
     );
   }
 
   Widget _buildAppBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
-      ),
+    return GlassHeader(
       child: Row(
         children: [
           const SizedBox(width: 48), // Spacer for centering

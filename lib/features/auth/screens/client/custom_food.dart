@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/models/food_entry.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
+import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
 class CustomFoodScreen extends StatefulWidget {
   const CustomFoodScreen({super.key});
@@ -22,6 +24,14 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
   final carbsController = TextEditingController();
   final fatController = TextEditingController();
 
+  bool _saveToLibrary = true;
+  bool _isSaving = false;
+
+  // Inline message shown above the buttons instead of a snackbar.
+  String? _message;
+  bool _messageIsError = true;
+  bool _libraryFailed = false;
+
   @override
   void dispose() {
     nameController.dispose();
@@ -37,50 +47,92 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
   double _parseNumber(String raw) =>
       double.tryParse(raw.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
 
-  void _createFood() {
+  Future<void> _createFood() async {
+    if (_isSaving) return;
+
     final name = nameController.text.trim();
     final kcal = _parseNumber(caloriesController.text);
 
     if (name.isEmpty || kcal <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter a food name and its calories.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      setState(() {
+        _message = 'Enter a food name and its calories.';
+        _messageIsError = true;
+      });
       return;
     }
 
-    Navigator.pop(
-      context,
-      FoodEntry(
-        name: name,
-        quantity: quantityController.text.trim(),
-        kcal: kcal.round(),
-        proteinG: _parseNumber(proteinController.text),
-        carbsG: _parseNumber(carbsController.text),
-        fatG: _parseNumber(fatController.text),
-      ),
+    setState(() => _message = null);
+
+    final food = FoodEntry(
+      name: name,
+      quantity: quantityController.text.trim(),
+      kcal: kcal.round(),
+      proteinG: _parseNumber(proteinController.text),
+      carbsG: _parseNumber(carbsController.text),
+      fatG: _parseNumber(fatController.text),
     );
+
+    if (_saveToLibrary && !_libraryFailed) {
+      setState(() => _isSaving = true);
+      final saved = await _saveToFoodLibrary(food);
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+
+      // Do not silently discard what the user typed. Explain, and let the
+      // next tap add it to this meal without saving to the library.
+      if (!saved) {
+        setState(() {
+          _libraryFailed = true;
+          _message =
+              'Could not save to your library. Tap again to add it to this meal only.';
+          _messageIsError = true;
+        });
+        return;
+      }
+    }
+
+    if (mounted) Navigator.pop(context, food);
+  }
+
+  // Upserts so re-entering the same name updates it instead of erroring on
+  // the unique index.
+  Future<bool> _saveToFoodLibrary(FoodEntry food) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      await Supabase.instance.client.from('custom_foods').upsert({
+        'user_id': user.id,
+        'name': food.name,
+        'quantity': food.quantity,
+        'kcal': food.kcal,
+        'protein_g': food.proteinG,
+        'carbs_g': food.carbsG,
+        'fat_g': food.fatG,
+        'last_used_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'user_id,name');
+      return true;
+    } catch (e) {
+      debugPrint('Failed to save custom food: $e');
+      return false;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildAppBar(context),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 25),
-                    _buildSectionHeader("BASIC INFORMATION"),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: GlassHeader.insetFor(context) + 25),
+                _buildSectionHeader("BASIC INFORMATION"),
                     _buildInputField(
                       "Food Name",
                       "e.g. Homemade Pancake",
@@ -135,25 +187,23 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
                       fatController,
                       isNumeric: true,
                     ),
-                    const SizedBox(height: 40),
-                    _buildActionButtons(context),
-                    const SizedBox(height: 30),
-                  ],
-                ),
-              ),
+                const SizedBox(height: 24),
+                _buildSaveToLibraryToggle(),
+                _buildMessageBanner(),
+                const SizedBox(height: 30),
+                _buildActionButtons(context),
+                const SizedBox(height: 30),
+              ],
             ),
-          ],
-        ),
+          ),
+          _buildAppBar(context),
+        ],
       ),
     );
   }
 
   Widget _buildAppBar(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
-      ),
+    return GlassHeader(
       child: Row(
         children: [
           const SizedBox(width: 8),
@@ -278,6 +328,99 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
     );
   }
 
+  // Inline, dismissible, and styled like the rest of the screen.
+  Widget _buildMessageBanner() {
+    final message = _message;
+    if (message == null) return const SizedBox.shrink();
+
+    final accent = _messageIsError ? const Color(0xFFF25151) : brandGreen;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: accent.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              _messageIsError
+                  ? Icons.error_outline_rounded
+                  : Icons.check_circle_outline_rounded,
+              color: accent,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: accent,
+                  fontSize: 13,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => setState(() => _message = null),
+              child: Icon(
+                Icons.close_rounded,
+                size: 16,
+                color: accent.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSaveToLibraryToggle() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: fieldBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Save for later",
+                  style: TextStyle(
+                    color: darkBlue,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  "Find it by name next time you log a meal.",
+                  style: TextStyle(color: textSecondary, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: _saveToLibrary,
+            activeThumbColor: brandGreen,
+            onChanged: (v) => setState(() => _saveToLibrary = v),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionButtons(BuildContext context) {
     return Row(
       children: [
@@ -306,20 +449,33 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
         Expanded(
           flex: 3,
           child: ElevatedButton(
-            onPressed: _createFood,
+            onPressed: _isSaving ? null : _createFood,
             style: ElevatedButton.styleFrom(
               backgroundColor: darkBlue,
               foregroundColor: Colors.white,
+              disabledBackgroundColor: darkBlue.withValues(alpha: 0.5),
               padding: const EdgeInsets.symmetric(vertical: 18),
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
             ),
-            child: const Text(
-              "Create Food",
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-            ),
+            child: _isSaving
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2.5,
+                    ),
+                  )
+                : Text(
+                    _libraryFailed ? "Add to Meal" : "Create Food",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
+                  ),
           ),
         ),
       ],

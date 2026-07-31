@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
+import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
 class MealPlanScreen extends StatefulWidget {
   final VoidCallback onBackToHome;
@@ -26,6 +27,9 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
   int totalKcal = 0;
   bool isLoading = true;
   bool isGenerating = false;
+
+  // Inline message instead of a snackbar.
+  String? _message;
 
   @override
   void initState() {
@@ -95,7 +99,10 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
   // Asks the Edge Function for a plan, then reloads from the database.
   Future<void> _generatePlan() async {
     if (isGenerating) return;
-    setState(() => isGenerating = true);
+    setState(() {
+      isGenerating = true;
+      _message = null;
+    });
 
     try {
       final response = await Supabase.instance.client.functions.invoke(
@@ -111,11 +118,8 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
       await _loadPlan();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not generate plan: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
+        setState(
+          () => _message = e.toString().replaceFirst('Exception: ', ''),
         );
       }
     }
@@ -129,63 +133,56 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildAppBar(),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _loadPlan,
-                color: brandGreen,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 10),
-                      _buildHorizontalCalendar(),
-                      const SizedBox(height: 30),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          RefreshIndicator(
+            onRefresh: _loadPlan,
+            color: brandGreen,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  SizedBox(height: GlassHeader.insetFor(context) + 10),
+                  _buildHorizontalCalendar(),
+                  _buildMessageBanner(),
+                  const SizedBox(height: 30),
 
-                      if (isLoading)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 60),
-                          child: CircularProgressIndicator(color: brandGreen),
-                        )
-                      else if (!hasPlan)
-                        _buildEmptyState()
-                      else ...[
-                        _buildCalorieSummary(),
-                        const SizedBox(height: 30),
-                        ...mealOrder
-                            .where((type) => itemsByMeal.containsKey(type))
-                            .map(
-                              (type) =>
-                                  _buildMealCard(type, itemsByMeal[type]!),
-                            ),
-                        const SizedBox(height: 10),
-                        _buildRegenerateButton(),
-                      ],
+                  if (isLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 60),
+                      child: CircularProgressIndicator(color: brandGreen),
+                    )
+                  else if (!hasPlan)
+                    _buildEmptyState()
+                  else ...[
+                    _buildCalorieSummary(),
+                    const SizedBox(height: 30),
+                    ...mealOrder
+                        .where((type) => itemsByMeal.containsKey(type))
+                        .map(
+                          (type) => _buildMealCard(type, itemsByMeal[type]!),
+                        ),
+                    const SizedBox(height: 10),
+                    _buildRegenerateButton(),
+                  ],
 
-                      const SizedBox(height: 40),
-                    ],
-                  ),
-                ),
+                  const SizedBox(height: 40),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          _buildAppBar(),
+        ],
       ),
     );
   }
 
   Widget _buildAppBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
-      ),
+    return GlassHeader(
       child: Row(
         children: [
           const SizedBox(width: 48), // Spacer for centering
@@ -298,6 +295,57 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  // Inline, dismissible, styled like the rest of the screen.
+  Widget _buildMessageBanner() {
+    final message = _message;
+    if (message == null) return const SizedBox.shrink();
+
+    const accent = Color(0xFFF25151);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: accent.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              color: accent,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: accent,
+                  fontSize: 13,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => setState(() => _message = null),
+              child: Icon(
+                Icons.close_rounded,
+                size: 16,
+                color: accent.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/screens/client/grocery.dart';
@@ -31,11 +33,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _consumedKcal = 0;
   int _mealsLogged = 0;
 
+  // Today's generated meal plan, empty until one has been generated.
+  List<Map<String, dynamic>> _todayPlan = [];
+
   @override
   void initState() {
     super.initState();
     _loadProfile();
     _loadTodayLogs();
+    _loadTodayPlan();
+  }
+
+  String get _todayKey {
+    final now = DateTime.now();
+    return '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+  }
+
+  // Loads the dishes planned for today, if a plan exists.
+  Future<void> _loadTodayPlan() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final plan = await supabase
+          .from('meal_plans')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('plan_date', _todayKey)
+          .maybeSingle();
+
+      if (plan == null) {
+        if (mounted) setState(() => _todayPlan = []);
+        return;
+      }
+
+      final items = await supabase
+          .from('meal_plan_items')
+          .select('meal_type, name, kcal')
+          .eq('plan_id', plan['id'])
+          .order('sort_order');
+
+      if (!mounted) return;
+      setState(
+        () => _todayPlan = List<Map<String, dynamic>>.from(items as List),
+      );
+    } catch (e) {
+      debugPrint('Failed to load today\'s plan: $e');
+    }
   }
 
   // Counts today's calories and how many distinct meals have entries.
@@ -44,18 +91,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final user = supabase.auth.currentUser;
     if (user == null) return;
 
-    final now = DateTime.now();
-    final today =
-        '${now.year.toString().padLeft(4, '0')}-'
-        '${now.month.toString().padLeft(2, '0')}-'
-        '${now.day.toString().padLeft(2, '0')}';
-
     try {
       final rows = await supabase
           .from('food_logs')
           .select('meal_type, kcal')
           .eq('user_id', user.id)
-          .eq('logged_date', today);
+          .eq('logged_date', _todayKey);
 
       var kcal = 0;
       final meals = <String>{};
@@ -138,14 +179,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      // Content passes under the bar so the blur has something to blur.
+      extendBodyBehindAppBar: true,
       appBar: _selectedIndex == 0 ? _buildHomeAppBar() : null,
       body: IndexedStack(index: _selectedIndex, children: pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
           setState(() => _selectedIndex = index);
-          // Totals may have changed while the user was logging meals.
-          if (index == 0) _loadTodayLogs();
+          // Logs and plans may have changed while the user was on another tab.
+          if (index == 0) {
+            _loadTodayLogs();
+            _loadTodayPlan();
+          }
         },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: brandGreen,
@@ -193,9 +239,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   PreferredSizeWidget _buildHomeAppBar() {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
       elevation: 0,
+      scrolledUnderElevation: 0,
       toolbarHeight: 70,
+      // Frosted glass: blur whatever scrolls beneath, tinted white so the
+      // dark text stays legible, with a hairline edge to separate it.
+      flexibleSpace: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.72),
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  width: 1,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
       title: Row(
         children: [
           Image.asset(
@@ -279,13 +344,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   );
 
   Widget _buildHomeContent() {
+    // The bar is transparent now, so the first item has to clear it manually.
+    final topInset = MediaQuery.of(context).padding.top + 70;
+
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 25),
+          SizedBox(height: topInset + 25),
           Text(
             _isLoadingProfile ? "Hello" : "Hello, $_greetingName",
             style: const TextStyle(
@@ -352,27 +420,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 10),
-          _buildMealItem(
-            "Breakfast",
-            "Oatmeal with Egg",
-            "350 kcal",
-            Icons.wb_sunny_outlined,
-            Colors.orange,
-          ),
-          _buildMealItem(
-            "Lunch",
-            "Grilled Chicken",
-            "550 kcal",
-            Icons.restaurant_rounded,
-            brandGreen,
-          ),
-          _buildMealItem(
-            "Dinner",
-            "Vegetable Salad",
-            "400 kcal",
-            Icons.nights_stay_outlined,
-            darkBlue,
-          ),
+          if (_todayPlan.isEmpty)
+            _buildNoPlanCard()
+          else
+            ..._todayPlan.map(
+              (item) => _buildMealItem(
+                item['meal_type'] as String? ?? 'Meal',
+                item['name'] as String? ?? '',
+                "${(item['kcal'] as num?)?.round() ?? 0} kcal",
+              ),
+            ),
           const SizedBox(height: 30),
         ],
       ),
@@ -533,13 +590,80 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildMealItem(
-    String title,
-    String dish,
-    String kcal,
-    IconData icon,
-    Color accentColor,
-  ) {
+  // Shown when no plan has been generated for today.
+  Widget _buildNoPlanCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+      decoration: _cardDecoration(),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.restaurant_menu_rounded,
+            size: 32,
+            color: borderColor,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            "No meal plan for today",
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+              color: darkBlue,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "Generate one from your goals and preferences.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextButton.icon(
+            onPressed: () => setState(() => _selectedIndex = 1),
+            icon: const Icon(
+              Icons.auto_awesome_rounded,
+              size: 16,
+              color: brandGreen,
+            ),
+            label: const Text(
+              "Go to Meal Plan",
+              style: TextStyle(color: brandGreen, fontWeight: FontWeight.w800),
+            ),
+            style: TextButton.styleFrom(
+              backgroundColor: brandGreen.withValues(alpha: 0.08),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Icon and accent colour per meal type.
+  (IconData, Color) _mealStyle(String mealType) {
+    switch (mealType.toLowerCase()) {
+      case 'breakfast':
+        return (Icons.wb_sunny_outlined, Colors.orange);
+      case 'lunch':
+        return (Icons.restaurant_rounded, brandGreen);
+      case 'dinner':
+        return (Icons.nights_stay_outlined, darkBlue);
+      default:
+        return (Icons.cookie_outlined, textSecondary);
+    }
+  }
+
+  Widget _buildMealItem(String title, String dish, String kcal) {
+    final (icon, accentColor) = _mealStyle(title);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
