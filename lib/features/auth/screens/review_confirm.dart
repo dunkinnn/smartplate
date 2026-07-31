@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/screens/client/dashboard.dart';
 
@@ -39,10 +40,12 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
         return;
       }
 
+      final avatarUrl = await _uploadAvatar(user.id);
+
       await Supabase.instance.client.from('user_profiles').upsert({
         'id': user.id,
         'full_name': widget.allData['full_name'],
-        'phone': widget.allData['phone'],
+        'avatar_url': avatarUrl,
         'age': widget.allData['age'],
         'gender': widget.allData['gender'],
         'height_cm': widget.allData['height_cm'],
@@ -93,11 +96,34 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
     if (mounted) setState(() => isLoading = false);
   }
 
+  // Uploads the picked photo to the avatars bucket and returns its public URL.
+  // Returns null when the user skipped choosing one.
+  Future<String?> _uploadAvatar(String userId) async {
+    final file = widget.allData['avatar_file'];
+    if (file is! File) return null;
+
+    const bucket = 'avatars';
+    final path = '$userId/avatar.jpg';
+    final storage = Supabase.instance.client.storage.from(bucket);
+
+    await storage.upload(
+      path,
+      file,
+      fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'),
+    );
+
+    // Cache-bust so a replaced photo shows up immediately.
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    return '${storage.getPublicUrl(path)}?v=$stamp';
+  }
+
   String _fmt(dynamic val) => val?.toString() ?? '—';
 
   @override
   Widget build(BuildContext context) {
     final d = widget.allData;
+
+    final avatar = d['avatar_file'];
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -123,11 +149,16 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
           children: [
             const SizedBox(height: 10),
 
+            if (avatar is File)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: CircleAvatar(radius: 50, backgroundImage: FileImage(avatar)),
+              ),
+
             _buildReviewSection(
               title: 'Personal Information',
               children: [
                 _buildReviewRow('Full Name', _fmt(d['full_name'])),
-                _buildReviewRow('Phone', _fmt(d['phone'])),
                 _buildReviewRow(
                   'Age / Gender',
                   '${_fmt(d['age'])} / ${_fmt(d['gender'])}',

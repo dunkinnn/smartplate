@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/models/food_entry.dart';
 import 'package:smart_plate/features/auth/screens/client/log_meal.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
 
@@ -16,9 +18,89 @@ class _TrackScreenState extends State<TrackScreen> {
   static const Color textMain = Color(0xFF1E293B);
   static const Color textSecondary = Color(0xFF64748B);
   static const Color bgLight = Color(0xFFF8FAFC);
-  static const Color borderColor = Color(0xFFE2E8F0); // New: Clean border color
+  static const Color borderColor = Color(0xFFE2E8F0);
 
-  String selectedDate = "24";
+  static const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+  static const mealIcons = {
+    'Breakfast': Icons.wb_sunny_outlined,
+    'Lunch': Icons.light_mode_outlined,
+    'Dinner': Icons.dark_mode_outlined,
+    'Snack': Icons.cookie_outlined,
+  };
+
+  DateTime selectedDate = DateTime.now();
+  Map<String, List<FoodEntry>> logsByMeal = {};
+  int? calorieTarget;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDay();
+  }
+
+  String _dateKey(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
+  // Loads the selected day's logs plus the calorie goal they are measured against.
+  Future<void> _loadDay() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => isLoading = false);
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      final rows = await supabase
+          .from('food_logs')
+          .select()
+          .eq('user_id', user.id)
+          .eq('logged_date', _dateKey(selectedDate))
+          .order('created_at');
+
+      final profile = await supabase
+          .from('user_profiles')
+          .select('calorie_target')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      final grouped = <String, List<FoodEntry>>{};
+      for (final row in rows as List) {
+        final map = row as Map<String, dynamic>;
+        final meal = map['meal_type'] as String? ?? 'Snack';
+        grouped.putIfAbsent(meal, () => []).add(FoodEntry.fromRow(map));
+      }
+
+      if (!mounted) return;
+      setState(() {
+        logsByMeal = grouped;
+        calorieTarget = (profile?['calorie_target'] as num?)?.round();
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Failed to load logs: $e');
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  int get _consumedKcal => logsByMeal.values
+      .expand((list) => list)
+      .fold(0, (sum, food) => sum + food.kcal);
+
+  Future<void> _openLogMeal() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LogMealScreen(initialDate: selectedDate),
+      ),
+    );
+    if (saved == true) _loadDay();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,35 +111,40 @@ class _TrackScreenState extends State<TrackScreen> {
           children: [
             _buildAppBar(),
             Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 15),
-                    _buildHorizontalCalendar(),
-                    const SizedBox(height: 25),
-                    _buildCalorieProgressCard(),
-                    const SizedBox(height: 30),
+              child: RefreshIndicator(
+                onRefresh: _loadDay,
+                color: brandGreen,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 15),
+                      _buildHorizontalCalendar(),
+                      const SizedBox(height: 25),
+                      _buildCalorieProgressCard(),
+                      const SizedBox(height: 30),
 
-                    _buildSectionHeader("DAILY LOGS"),
-                    _buildTrackMealCard("Breakfast", [
-                      {"name": "Oatmeal with Egg", "kcal": "350 kcal"},
-                      {"name": "Boiled Egg", "kcal": "120 kcal"},
-                    ], Icons.wb_sunny_outlined),
+                      _buildSectionHeader("DAILY LOGS"),
+                      if (isLoading)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40),
+                          child: CircularProgressIndicator(color: brandGreen),
+                        )
+                      else
+                        ...mealTypes.map(
+                          (type) => _buildTrackMealCard(
+                            type,
+                            logsByMeal[type] ?? const [],
+                            mealIcons[type]!,
+                          ),
+                        ),
 
-                    _buildTrackMealCard("Lunch", [
-                      {"name": "Grilled Chicken with Rice", "kcal": "550 kcal"},
-                      {"name": "Steamed Vegetables", "kcal": "180 kcal"},
-                    ], Icons.light_mode_outlined),
-
-                    _buildTrackMealCard("Dinner", [
-                      {"name": "Vegetable Salad", "kcal": "400 kcal"},
-                      {"name": "Fruit Yogurt", "kcal": "150 kcal"},
-                    ], Icons.dark_mode_outlined),
-
-                    const SizedBox(height: 30),
-                  ],
+                      const SizedBox(height: 30),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -120,27 +207,29 @@ class _TrackScreenState extends State<TrackScreen> {
     );
   }
 
+  // Rolling week ending today.
   Widget _buildHorizontalCalendar() {
-    final List<Map<String, String>> days = [
-      {"day": "Tue", "date": "23"},
-      {"day": "Wed", "date": "24"},
-      {"day": "Thu", "date": "25"},
-      {"day": "Fri", "date": "26"},
-      {"day": "Sat", "date": "27"},
-      {"day": "Sun", "date": "28"},
-      {"day": "Mon", "date": "29"},
-    ];
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final today = DateTime.now();
+    final days = List.generate(
+      7,
+      (i) => DateTime(today.year, today.month, today.day - (6 - i)),
+    );
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: days.map((d) {
-        bool isSelected = d["date"] == selectedDate;
+      children: days.map((date) {
+        final isSelected = _dateKey(date) == _dateKey(selectedDate);
+
         return GestureDetector(
-          onTap: () => setState(() => selectedDate = d["date"]!),
+          onTap: () {
+            setState(() => selectedDate = date);
+            _loadDay();
+          },
           child: Column(
             children: [
               Text(
-                d["day"]!,
+                dayNames[date.weekday - 1],
                 style: TextStyle(
                   color: isSelected ? darkBlue : textSecondary,
                   fontSize: 12,
@@ -172,7 +261,7 @@ class _TrackScreenState extends State<TrackScreen> {
                       : [],
                 ),
                 child: Text(
-                  d["date"]!,
+                  '${date.day}',
                   style: TextStyle(
                     color: isSelected ? Colors.white : textMain,
                     fontWeight: FontWeight.w700,
@@ -187,6 +276,14 @@ class _TrackScreenState extends State<TrackScreen> {
   }
 
   Widget _buildCalorieProgressCard() {
+    final target = calorieTarget;
+    final consumed = _consumedKcal;
+    final progress = (target != null && target > 0)
+        ? (consumed / target).clamp(0.0, 1.0)
+        : 0.0;
+    final remaining = target != null ? target - consumed : null;
+    final isOver = remaining != null && remaining < 0;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -210,24 +307,24 @@ class _TrackScreenState extends State<TrackScreen> {
                 height: 100,
                 width: 100,
                 child: CircularProgressIndicator(
-                  value: 0.66,
+                  value: progress,
                   strokeWidth: 10,
-                  color: brandGreen,
+                  color: isOver ? const Color(0xFFF25151) : brandGreen,
                   backgroundColor: Colors.white.withValues(alpha: 0.1),
                   strokeCap: StrokeCap.round,
                 ),
               ),
-              const Column(
+              Column(
                 children: [
                   Text(
-                    "1,200",
-                    style: TextStyle(
+                    _formatNumber(consumed),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
                       fontSize: 18,
                     ),
                   ),
-                  Text(
+                  const Text(
                     "kcal",
                     style: TextStyle(color: Colors.white70, fontSize: 10),
                   ),
@@ -240,17 +337,19 @@ class _TrackScreenState extends State<TrackScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "Remaining",
-                  style: TextStyle(
+                Text(
+                  isOver ? "Over by" : "Remaining",
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const Text(
-                  "600 kcal",
-                  style: TextStyle(
+                Text(
+                  remaining != null
+                      ? "${_formatNumber(remaining.abs())} kcal"
+                      : "No goal set",
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -263,13 +362,18 @@ class _TrackScreenState extends State<TrackScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: brandGreen.withValues(alpha: 0.2),
+                    color: (isOver ? const Color(0xFFF25151) : brandGreen)
+                        .withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text(
-                    "ON TRACK",
+                  child: Text(
+                    isOver
+                        ? "OVER TARGET"
+                        : consumed == 0
+                        ? "NOTHING LOGGED"
+                        : "ON TRACK",
                     style: TextStyle(
-                      color: brandGreen,
+                      color: isOver ? const Color(0xFFF25151) : brandGreen,
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 1,
@@ -283,6 +387,11 @@ class _TrackScreenState extends State<TrackScreen> {
       ),
     );
   }
+
+  String _formatNumber(int value) => value.toString().replaceAllMapped(
+    RegExp(r'(\d)(?=(\d{3})+$)'),
+    (m) => '${m[1]},',
+  );
 
   Widget _buildSectionHeader(String title) {
     return Container(
@@ -302,7 +411,7 @@ class _TrackScreenState extends State<TrackScreen> {
 
   Widget _buildTrackMealCard(
     String title,
-    List<Map<String, String>> items,
+    List<FoodEntry> items,
     IconData icon,
   ) {
     return Container(
@@ -328,45 +437,68 @@ class _TrackScreenState extends State<TrackScreen> {
                 ),
               ),
               const Spacer(),
-              const Icon(Icons.more_horiz, color: textSecondary),
+              Text(
+                items.isEmpty
+                    ? "—"
+                    : "${items.fold(0, (s, f) => s + f.kcal)} kcal",
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
-          ...items.map(
-            (item) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    item["name"]!,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: darkBlue,
-                      fontWeight: FontWeight.w500,
+          if (items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text(
+                "Nothing logged yet",
+                style: TextStyle(
+                  fontSize: 13,
+                  color: textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            )
+          else
+            ...items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.quantity.isEmpty
+                            ? item.name
+                            : "${item.name} (${item.quantity})",
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: darkBlue,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
-                  ),
-                  Text(
-                    item["kcal"]!,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: textSecondary,
-                      fontWeight: FontWeight.w600,
+                    Text(
+                      "${item.kcal} kcal",
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             height: 44,
             child: TextButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const LogMealScreen()),
-              ),
+              onPressed: _openLogMeal,
               icon: const Icon(Icons.add_rounded, color: brandGreen, size: 18),
               label: const Text(
                 "Log Item",

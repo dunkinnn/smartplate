@@ -1,14 +1,68 @@
 import 'package:flutter/material.dart';
+import 'package:smart_plate/features/auth/models/food_entry.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
 
-class CustomFoodScreen extends StatelessWidget {
+class CustomFoodScreen extends StatefulWidget {
   const CustomFoodScreen({super.key});
 
+  @override
+  State<CustomFoodScreen> createState() => _CustomFoodScreenState();
+}
+
+class _CustomFoodScreenState extends State<CustomFoodScreen> {
   static const Color brandGreen = Color(0xFF67A75F);
   static const Color darkBlue = Color(0xFF1E293B);
   static const Color textSecondary = Color(0xFF64748B);
   static const Color fieldBg = Color(0xFFF8FAFC);
-  static const Color accentPink = Color(0xFFFB4B93);
+
+  final nameController = TextEditingController();
+  final quantityController = TextEditingController();
+  final caloriesController = TextEditingController();
+  final proteinController = TextEditingController();
+  final carbsController = TextEditingController();
+  final fatController = TextEditingController();
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    quantityController.dispose();
+    caloriesController.dispose();
+    proteinController.dispose();
+    carbsController.dispose();
+    fatController.dispose();
+    super.dispose();
+  }
+
+  // Strips any unit the user typed, so "220 kcal" and "220" both work.
+  double _parseNumber(String raw) =>
+      double.tryParse(raw.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0;
+
+  void _createFood() {
+    final name = nameController.text.trim();
+    final kcal = _parseNumber(caloriesController.text);
+
+    if (name.isEmpty || kcal <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter a food name and its calories.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    Navigator.pop(
+      context,
+      FoodEntry(
+        name: name,
+        quantity: quantityController.text.trim(),
+        kcal: kcal.round(),
+        proteinG: _parseNumber(proteinController.text),
+        carbsG: _parseNumber(carbsController.text),
+        fatG: _parseNumber(fatController.text),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +85,7 @@ class CustomFoodScreen extends StatelessWidget {
                       "Food Name",
                       "e.g. Homemade Pancake",
                       Icons.restaurant_menu_rounded,
+                      nameController,
                     ),
                     const SizedBox(height: 20),
                     Row(
@@ -40,6 +95,7 @@ class CustomFoodScreen extends StatelessWidget {
                             "Quantity",
                             "100g",
                             Icons.scale_rounded,
+                            quantityController,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -48,6 +104,8 @@ class CustomFoodScreen extends StatelessWidget {
                             "Calories",
                             "220 kcal",
                             Icons.local_fire_department_rounded,
+                            caloriesController,
+                            isNumeric: true,
                           ),
                         ),
                       ],
@@ -58,15 +116,25 @@ class CustomFoodScreen extends StatelessWidget {
                       "Protein",
                       "0g",
                       Icons.fitness_center_rounded,
+                      proteinController,
+                      isNumeric: true,
                     ),
                     const SizedBox(height: 16),
                     _buildInputField(
                       "Carbohydrates",
                       "0g",
                       Icons.bakery_dining_rounded,
+                      carbsController,
+                      isNumeric: true,
                     ),
                     const SizedBox(height: 16),
-                    _buildInputField("Fats", "0g", Icons.water_drop_rounded),
+                    _buildInputField(
+                      "Fats",
+                      "0g",
+                      Icons.water_drop_rounded,
+                      fatController,
+                      isNumeric: true,
+                    ),
                     const SizedBox(height: 40),
                     _buildActionButtons(context),
                     const SizedBox(height: 30),
@@ -98,15 +166,25 @@ class CustomFoodScreen extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
           ),
           const Expanded(
-            child: Text(
-              "Add Custom Item",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: darkBlue,
-                letterSpacing: -0.5,
-              ),
+            child: Column(
+              children: [
+                Text(
+                  "Custom Food",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: darkBlue,
+                  ),
+                ),
+                Text(
+                  "Add your own recipe",
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
           IconButton(
@@ -125,7 +203,6 @@ class CustomFoodScreen extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(width: 8),
         ],
       ),
     );
@@ -146,7 +223,13 @@ class CustomFoodScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInputField(String label, String hint, IconData icon) {
+  Widget _buildInputField(
+    String label,
+    String hint,
+    IconData icon,
+    TextEditingController controller, {
+    bool isNumeric = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -162,6 +245,10 @@ class CustomFoodScreen extends StatelessWidget {
           ),
         ),
         TextField(
+          controller: controller,
+          keyboardType: isNumeric
+              ? const TextInputType.numberWithOptions(decimal: true)
+              : TextInputType.text,
           style: const TextStyle(fontWeight: FontWeight.w600, color: darkBlue),
           decoration: InputDecoration(
             hintText: hint,
@@ -219,7 +306,7 @@ class CustomFoodScreen extends StatelessWidget {
         Expanded(
           flex: 3,
           child: ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: _createFood,
             style: ElevatedButton.styleFrom(
               backgroundColor: darkBlue,
               foregroundColor: Colors.white,

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/models/food_entry.dart';
 import 'package:smart_plate/features/auth/screens/client/custom_food.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
 
 class LogMealScreen extends StatefulWidget {
-  const LogMealScreen({super.key});
+  final DateTime? initialDate;
+  const LogMealScreen({super.key, this.initialDate});
 
   @override
   State<LogMealScreen> createState() => _LogMealScreenState();
@@ -15,8 +18,101 @@ class _LogMealScreenState extends State<LogMealScreen> {
   static const Color textSecondary = Color(0xFF64748B);
   static const Color bgLight = Color(0xFFF8FAFC);
 
-  String selectedDate = "24";
-  String? selectedMealType = "Breakfast";
+  late DateTime selectedDate;
+  String selectedMealType = "Breakfast";
+  bool isSaving = false;
+
+  // Foods staged for this meal, saved together when the user taps Save.
+  final List<FoodEntry> stagedFoods = [];
+
+  @override
+  void initState() {
+    super.initState();
+    selectedDate = widget.initialDate ?? DateTime.now();
+  }
+
+  int get _totalKcal =>
+      stagedFoods.fold(0, (sum, food) => sum + food.kcal);
+  double get _totalProtein =>
+      stagedFoods.fold(0.0, (sum, food) => sum + food.proteinG);
+  double get _totalCarbs =>
+      stagedFoods.fold(0.0, (sum, food) => sum + food.carbsG);
+  double get _totalFat =>
+      stagedFoods.fold(0.0, (sum, food) => sum + food.fatG);
+
+  Future<void> _addCustomFood() async {
+    final food = await Navigator.push<FoodEntry>(
+      context,
+      MaterialPageRoute(builder: (context) => const CustomFoodScreen()),
+    );
+
+    if (food != null && mounted) {
+      setState(() => stagedFoods.add(food));
+    }
+  }
+
+  Future<void> _saveMealLog() async {
+    if (isSaving) return;
+
+    if (stagedFoods.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add at least one food before saving.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No user session found. Please log in again.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() => isSaving = true);
+
+    try {
+      await Supabase.instance.client.from('food_logs').insert(
+        stagedFoods
+            .map(
+              (food) => food.toRow(
+                userId: user.id,
+                date: selectedDate,
+                mealType: selectedMealType,
+              ),
+            )
+            .toList(),
+      );
+
+      if (mounted) Navigator.pop(context, true);
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not save: ${e.message}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+
+    if (mounted) setState(() => isSaving = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +143,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _buildMealTypeChips(), // Updated from Dropdown to Chips
+                    _buildMealTypeChips(),
 
                     const SizedBox(height: 25),
                     _buildSearchBar(),
@@ -57,16 +153,16 @@ class _LogMealScreenState extends State<LogMealScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          selectedMealType ?? "Meal",
+                          selectedMealType,
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                             color: darkBlue,
                           ),
                         ),
-                        const Text(
-                          "250 kcal total",
-                          style: TextStyle(
+                        Text(
+                          "$_totalKcal kcal total",
+                          style: const TextStyle(
                             color: brandGreen,
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
@@ -76,18 +172,12 @@ class _LogMealScreenState extends State<LogMealScreen> {
                     ),
                     const SizedBox(height: 15),
 
-                    _buildFoodItem(
-                      "Oatmeal",
-                      "50g",
-                      "150 kcal",
-                      Icons.bakery_dining_rounded,
-                    ),
-                    _buildFoodItem(
-                      "Banana",
-                      "100g",
-                      "100 kcal",
-                      Icons.apple_rounded,
-                    ),
+                    if (stagedFoods.isEmpty)
+                      _buildEmptyState()
+                    else
+                      ...stagedFoods.asMap().entries.map(
+                        (entry) => _buildFoodItem(entry.key, entry.value),
+                      ),
 
                     const SizedBox(height: 12),
                     _buildCustomButton("Add Custom Food", Icons.add_rounded),
@@ -166,27 +256,29 @@ class _LogMealScreenState extends State<LogMealScreen> {
     );
   }
 
+  // Rolling week ending today, so the dates are always current.
   Widget _buildHorizontalCalendar() {
-    final List<Map<String, String>> days = [
-      {"day": "Tue", "date": "23"},
-      {"day": "Wed", "date": "24"},
-      {"day": "Thu", "date": "25"},
-      {"day": "Fri", "date": "26"},
-      {"day": "Sat", "date": "27"},
-      {"day": "Sun", "date": "28"},
-      {"day": "Mon", "date": "29"},
-    ];
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final today = DateTime.now();
+    final days = List.generate(
+      7,
+      (i) => DateTime(today.year, today.month, today.day - (6 - i)),
+    );
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: days.map((d) {
-        bool isSelected = d["date"] == selectedDate;
+      children: days.map((date) {
+        final isSelected =
+            date.year == selectedDate.year &&
+            date.month == selectedDate.month &&
+            date.day == selectedDate.day;
+
         return GestureDetector(
-          onTap: () => setState(() => selectedDate = d["date"]!),
+          onTap: () => setState(() => selectedDate = date),
           child: Column(
             children: [
               Text(
-                d["day"]!,
+                dayNames[date.weekday - 1],
                 style: TextStyle(
                   color: isSelected ? darkBlue : textSecondary,
                   fontSize: 12,
@@ -214,7 +306,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
                       : [],
                 ),
                 child: Text(
-                  d["date"]!,
+                  '${date.day}',
                   style: TextStyle(
                     color: isSelected ? Colors.white : textSecondary,
                     fontWeight: FontWeight.w700,
@@ -256,6 +348,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
     );
   }
 
+  // Search needs a food database, which does not exist yet. Disabled until then.
   Widget _buildSearchBar() {
     return Container(
       decoration: BoxDecoration(
@@ -268,18 +361,19 @@ class _LogMealScreenState extends State<LogMealScreen> {
         ],
       ),
       child: TextField(
+        enabled: false,
         decoration: InputDecoration(
-          hintText: "Search food or scan barcode...",
+          hintText: "Food search coming soon",
           hintStyle: const TextStyle(color: textSecondary, fontSize: 14),
           prefixIcon: const Icon(Icons.search_rounded, color: brandGreen),
-          suffixIcon: const Icon(
-            Icons.qr_code_scanner_rounded,
-            color: textSecondary,
-          ),
           filled: true,
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.all(16),
           border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          disabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
           ),
@@ -288,12 +382,32 @@ class _LogMealScreenState extends State<LogMealScreen> {
     );
   }
 
-  Widget _buildFoodItem(
-    String name,
-    String weight,
-    String kcal,
-    IconData icon,
-  ) {
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 30),
+      decoration: BoxDecoration(
+        color: bgLight,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: const Column(
+        children: [
+          Icon(Icons.no_food_outlined, color: textSecondary, size: 32),
+          SizedBox(height: 10),
+          Text(
+            "No food added yet",
+            style: TextStyle(
+              color: textSecondary,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFoodItem(int index, FoodEntry food) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -310,7 +424,11 @@ class _LogMealScreenState extends State<LogMealScreen> {
               color: bgLight,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: brandGreen, size: 22),
+            child: const Icon(
+              Icons.restaurant_menu_rounded,
+              color: brandGreen,
+              size: 22,
+            ),
           ),
           const SizedBox(width: 15),
           Expanded(
@@ -318,26 +436,27 @@ class _LogMealScreenState extends State<LogMealScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  food.name,
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
                     color: darkBlue,
                     fontSize: 15,
                   ),
                 ),
-                Text(
-                  weight,
-                  style: const TextStyle(
-                    color: textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                if (food.quantity.isNotEmpty)
+                  Text(
+                    food.quantity,
+                    style: const TextStyle(
+                      color: textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
           Text(
-            kcal,
+            "${food.kcal} kcal",
             style: const TextStyle(
               fontWeight: FontWeight.w900,
               color: darkBlue,
@@ -345,10 +464,13 @@ class _LogMealScreenState extends State<LogMealScreen> {
             ),
           ),
           const SizedBox(width: 15),
-          const Icon(
-            Icons.remove_circle_outline_rounded,
-            color: Color(0xFFF25151),
-            size: 20,
+          GestureDetector(
+            onTap: () => setState(() => stagedFoods.removeAt(index)),
+            child: const Icon(
+              Icons.remove_circle_outline_rounded,
+              color: Color(0xFFF25151),
+              size: 20,
+            ),
           ),
         ],
       ),
@@ -357,10 +479,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
 
   Widget _buildCustomButton(String label, IconData icon) {
     return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const CustomFoodScreen()),
-      ),
+      onTap: _addCustomFood,
       child: Container(
         height: 55,
         decoration: BoxDecoration(
@@ -414,9 +533,9 @@ class _LogMealScreenState extends State<LogMealScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildMacroInfo("Prot", "24g", brandGreen),
-              _buildMacroInfo("Carb", "42g", darkBlue),
-              _buildMacroInfo("Fat", "8g", const Color(0xFFFB4B93)),
+              _buildMacroInfo("Prot", _totalProtein, brandGreen),
+              _buildMacroInfo("Carb", _totalCarbs, darkBlue),
+              _buildMacroInfo("Fat", _totalFat, const Color(0xFFFB4B93)),
             ],
           ),
         ],
@@ -424,7 +543,11 @@ class _LogMealScreenState extends State<LogMealScreen> {
     );
   }
 
-  Widget _buildMacroInfo(String label, String val, Color color) {
+  Widget _buildMacroInfo(String label, double grams, Color color) {
+    final display = grams % 1 == 0
+        ? grams.toStringAsFixed(0)
+        : grams.toStringAsFixed(1);
+
     return Row(
       children: [
         Container(
@@ -442,7 +565,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
           ),
         ),
         Text(
-          val,
+          "${display}g",
           style: const TextStyle(
             fontWeight: FontWeight.w900,
             fontSize: 12,
@@ -458,19 +581,29 @@ class _LogMealScreenState extends State<LogMealScreen> {
       width: double.infinity,
       height: 60,
       child: ElevatedButton(
-        onPressed: () => Navigator.pop(context),
+        onPressed: isSaving ? null : _saveMealLog,
         style: ElevatedButton.styleFrom(
           backgroundColor: brandGreen,
           foregroundColor: Colors.white,
+          disabledBackgroundColor: brandGreen.withValues(alpha: 0.5),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
         ),
-        child: const Text(
-          "Save Meal Log",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-        ),
+        child: isSaving
+            ? const SizedBox(
+                height: 22,
+                width: 22,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
+            : const Text(
+                "Save Meal Log",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+              ),
       ),
     );
   }

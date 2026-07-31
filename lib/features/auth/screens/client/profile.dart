@@ -49,18 +49,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final user = _supabase.auth.currentUser;
 
       if (user != null) {
-        // Only fetch if we need extra data from profiles table
+        // Extra data lives in user_profiles, written by the signup wizard.
         final response = await _supabase
-            .from('profiles')
+            .from('user_profiles')
             .select('full_name, avatar_url')
             .eq('id', user.id)
-            .single()
+            .maybeSingle()
             .timeout(
               const Duration(seconds: 3), // Max 3 seconds timeout
               onTimeout: () => {'full_name': null, 'avatar_url': null},
             );
 
-        if (mounted) {
+        if (mounted && response != null) {
           setState(() {
             if (response['full_name'] != null) {
               userName = response['full_name'];
@@ -116,7 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildOptionTile(
                 Icons.person_outline_rounded,
                 "Personal Info",
-                "Name, Email, Phone",
+                "Name, Email, Photo",
               ),
               _buildOptionTile(
                 Icons.shield_outlined,

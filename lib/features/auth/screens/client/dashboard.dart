@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/screens/client/grocery.dart';
 import 'package:smart_plate/features/auth/screens/client/insight.dart';
 import 'package:smart_plate/features/auth/screens/client/meal_plan.dart';
@@ -20,29 +21,132 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const Color textSecondary = Color(0xFF64748B);
   static const Color borderColor = Color(0xFFE2E8F0);
 
-  late final List<Widget> _pages;
+  // Profile data loaded from Supabase.
+  String? _fullName;
+  String? _avatarUrl;
+  int? _calorieTarget;
+  bool _isLoadingProfile = true;
+
+  // Today's totals from food_logs.
+  int _consumedKcal = 0;
+  int _mealsLogged = 0;
 
   @override
   void initState() {
     super.initState();
-    _pages = [
+    _loadProfile();
+    _loadTodayLogs();
+  }
+
+  // Counts today's calories and how many distinct meals have entries.
+  Future<void> _loadTodayLogs() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    final now = DateTime.now();
+    final today =
+        '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+
+    try {
+      final rows = await supabase
+          .from('food_logs')
+          .select('meal_type, kcal')
+          .eq('user_id', user.id)
+          .eq('logged_date', today);
+
+      var kcal = 0;
+      final meals = <String>{};
+      for (final row in rows as List) {
+        kcal += ((row as Map)['kcal'] as num?)?.round() ?? 0;
+        meals.add(row['meal_type'] as String? ?? '');
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _consumedKcal = kcal;
+        _mealsLogged = meals.length;
+      });
+    } catch (e) {
+      debugPrint('Failed to load today\'s logs: $e');
+    }
+  }
+
+  // Share of the calorie target consumed today, 0 when no goal is set.
+  double get _goalProgress {
+    final target = _calorieTarget;
+    if (target == null || target <= 0) return 0;
+    return (_consumedKcal / target).clamp(0.0, 1.0);
+  }
+
+  // Pulls the signed-in user's saved profile; falls back to auth metadata
+  // so the greeting still works if the row is missing.
+  Future<void> _loadProfile() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user == null) {
+      if (mounted) setState(() => _isLoadingProfile = false);
+      return;
+    }
+
+    try {
+      final row = await supabase
+          .from('user_profiles')
+          .select('full_name, avatar_url, calorie_target')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (!mounted) return;
+      setState(() {
+        _fullName =
+            row?['full_name'] as String? ??
+            user.userMetadata?['full_name'] as String?;
+        _avatarUrl = row?['avatar_url'] as String?;
+        _calorieTarget = (row?['calorie_target'] as num?)?.round();
+        _isLoadingProfile = false;
+      });
+    } catch (e) {
+      debugPrint('Failed to load profile: $e');
+      if (mounted) {
+        setState(() {
+          _fullName = user.userMetadata?['full_name'] as String?;
+          _isLoadingProfile = false;
+        });
+      }
+    }
+  }
+
+  // First name only, for the greeting.
+  String get _greetingName {
+    final name = _fullName?.trim();
+    if (name == null || name.isEmpty) return 'there';
+    return name.split(' ').first;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = [
       _buildHomeContent(),
       MealPlanScreen(onBackToHome: () => setState(() => _selectedIndex = 0)),
       GroceryScreen(onBackToHome: () => setState(() => _selectedIndex = 0)),
       TrackScreen(onBackToHome: () => setState(() => _selectedIndex = 0)),
       InsightsScreen(onBackToHome: () => setState(() => _selectedIndex = 0)),
     ];
-  }
 
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: _selectedIndex == 0 ? _buildHomeAppBar() : null,
-      body: IndexedStack(index: _selectedIndex, children: _pages),
+      body: IndexedStack(index: _selectedIndex, children: pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
+        onTap: (index) {
+          setState(() => _selectedIndex = index);
+          // Totals may have changed while the user was logging meals.
+          if (index == 0) _loadTodayLogs();
+        },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: brandGreen,
         unselectedItemColor: textSecondary,
@@ -150,18 +254,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ProfileScreen(onBack: () => Navigator.pop(context)),
             ),
           ),
-          child: const Padding(
-            padding: EdgeInsets.only(right: 15, left: 5),
+          child: Padding(
+            padding: const EdgeInsets.only(right: 15, left: 5),
             child: CircleAvatar(
               radius: 18,
               backgroundColor: borderColor,
-              backgroundImage: AssetImage('assets/images/profile.png'),
+              backgroundImage: _avatarUrl != null
+                  ? NetworkImage(_avatarUrl!)
+                  : null,
+              child: _avatarUrl == null
+                  ? const Icon(Icons.person, size: 20, color: textSecondary)
+                  : null,
             ),
           ),
         ),
       ],
     );
   }
+
+  // 1800 -> "1,800"
+  String _formatNumber(int value) => value.toString().replaceAllMapped(
+    RegExp(r'(\d)(?=(\d{3})+$)'),
+    (m) => '${m[1]},',
+  );
 
   Widget _buildHomeContent() {
     return SingleChildScrollView(
@@ -171,9 +286,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 25),
-          const Text(
-            "Hello, Jemima",
-            style: TextStyle(
+          Text(
+            _isLoadingProfile ? "Hello" : "Hello, $_greetingName",
+            style: const TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w900,
               color: darkBlue,
@@ -193,17 +308,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               _buildSummaryCard(
                 "Calories",
-                "1,200",
-                "/ 1,800",
-                0.66,
+                _formatNumber(_consumedKcal),
+                _calorieTarget != null
+                    ? "/ ${_formatNumber(_calorieTarget!)}"
+                    : "logged today",
+                _goalProgress,
                 Icons.local_fire_department_rounded,
               ),
               const SizedBox(width: 15),
               _buildSummaryCard(
                 "Log Status",
-                "2 of 3",
+                "$_mealsLogged of 3",
                 "Meals logged",
-                0.66,
+                (_mealsLogged / 3).clamp(0.0, 1.0),
                 Icons.assignment_turned_in_rounded,
               ),
             ],
@@ -357,9 +474,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  "You've consumed 66% of your target.",
-                  style: TextStyle(
+                Text(
+                  _calorieTarget == null
+                      ? "Set a calorie target to track progress."
+                      : "You've consumed ${(_goalProgress * 100).round()}% of your target.",
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -367,7 +486,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 15),
                 ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () => setState(() => _selectedIndex = 3),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: brandGreen,
                     foregroundColor: Colors.white,
@@ -392,16 +511,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 height: 80,
                 width: 80,
                 child: CircularProgressIndicator(
-                  value: 0.66,
+                  value: _goalProgress,
                   strokeWidth: 8,
                   color: brandGreen,
                   backgroundColor: Colors.white10,
                   strokeCap: StrokeCap.round,
                 ),
               ),
-              const Text(
-                "66%",
-                style: TextStyle(
+              Text(
+                "${(_goalProgress * 100).round()}%",
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,
                   fontSize: 16,

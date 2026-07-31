@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:smart_plate/features/auth/screens/preferences.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -14,42 +18,88 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const Color textGrey = Color(0xFF64748B);
 
   final fullNameController = TextEditingController();
-  final phoneController = TextEditingController();
   final ageController = TextEditingController();
+  final heightController = TextEditingController();
+  final weightController = TextEditingController();
 
   String? selectedGender;
-  String? selectedHeight;
-  String? selectedWeight;
+  File? avatarFile;
 
   final List<String> genderOptions = ['Male', 'Female', 'Other'];
-  final List<String> heightOptions = List.generate(
-    81,
-    (i) => '${140 + i}',
-  ); // 140cm to 220cm
-  final List<String> weightOptions = List.generate(
-    121,
-    (i) => '${30 + i}',
-  ); // 30kg to 150kg
 
   @override
   void dispose() {
     fullNameController.dispose();
-    phoneController.dispose();
     ageController.dispose();
+    heightController.dispose();
+    weightController.dispose();
     super.dispose();
   }
 
+  // Lets the user pick a photo from the gallery or take a new one.
+  Future<void> _pickAvatar() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: brandGreen),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera, color: brandGreen),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    // Downscale on pick so the upload stays small.
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 85,
+    );
+
+    if (picked != null && mounted) {
+      setState(() => avatarFile = File(picked.path));
+    }
+  }
+
   void _goNext() {
+    final age = int.tryParse(ageController.text.trim());
+    final height = double.tryParse(heightController.text.trim());
+    final weight = double.tryParse(weightController.text.trim());
+
+    String? error;
     if (fullNameController.text.trim().isEmpty ||
         ageController.text.trim().isEmpty ||
-        selectedGender == null ||
-        selectedHeight == null ||
-        selectedWeight == null) {
+        heightController.text.trim().isEmpty ||
+        weightController.text.trim().isEmpty ||
+        selectedGender == null) {
+      error = 'Please fill all fields before continuing.';
+    } else if (age == null || age < 13 || age > 120) {
+      error = 'Enter an age between 13 and 120.';
+    } else if (height == null || height < 100 || height > 250) {
+      error = 'Enter a height between 100 and 250 cm.';
+    } else if (weight == null || weight < 25 || weight > 300) {
+      error = 'Enter a weight between 25 and 300 kg.';
+    }
+
+    if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill all fields before continuing.'),
-          backgroundColor: Colors.redAccent,
-        ),
+        SnackBar(content: Text(error), backgroundColor: Colors.redAccent),
       );
       return;
     }
@@ -60,11 +110,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         builder: (context) => PreferencesScreen(
           profileData: {
             'full_name': fullNameController.text.trim(),
-            'phone': phoneController.text.trim(),
-            'age': int.tryParse(ageController.text.trim()),
+            'age': age,
             'gender': selectedGender,
-            'height_cm': double.tryParse(selectedHeight!),
-            'weight_kg': double.tryParse(selectedWeight!),
+            'height_cm': height,
+            'weight_kg': weight,
+            'avatar_file': avatarFile,
           },
         ),
       ),
@@ -97,49 +147,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 10),
-            // Profile Picture
-            Center(
-              child: Stack(
-                children: [
-                  const CircleAvatar(
-                    radius: 65,
-                    backgroundImage: NetworkImage(
-                      'https://via.placeholder.com/150',
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 5,
-                    right: 5,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: brandGreen,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.edit,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            Center(child: _buildAvatarPicker()),
             const SizedBox(height: 30),
 
             _buildLabel('FULL NAME'),
             _buildTextField(
               hint: 'Enter your full name',
               controller: fullNameController,
-            ),
-
-            const SizedBox(height: 20),
-            _buildLabel('PHONE NUMBER'),
-            _buildTextField(
-              hint: 'e.g., 09123456789',
-              controller: phoneController,
-              keyboardType: TextInputType.phone,
             ),
 
             const SizedBox(height: 20),
@@ -154,6 +168,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         hint: 'e.g., 25',
                         controller: ageController,
                         keyboardType: TextInputType.number,
+                        digitsOnly: true,
                       ),
                     ],
                   ),
@@ -178,23 +193,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
 
             const SizedBox(height: 20),
-            _buildLabel('HEIGHT'),
-            _buildDropdownField(
-              hint: 'Select height (cm)',
-              value: selectedHeight,
-              items: heightOptions,
-              onChanged: (val) => setState(() => selectedHeight = val),
-              suffix: 'cm',
-            ),
-
-            const SizedBox(height: 20),
-            _buildLabel('WEIGHT'),
-            _buildDropdownField(
-              hint: 'Select weight (kg)',
-              value: selectedWeight,
-              items: weightOptions,
-              onChanged: (val) => setState(() => selectedWeight = val),
-              suffix: 'kg',
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('HEIGHT'),
+                      _buildTextField(
+                        hint: 'e.g., 170',
+                        controller: heightController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        suffix: 'cm',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('WEIGHT'),
+                      _buildTextField(
+                        hint: 'e.g., 65',
+                        controller: weightController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        suffix: 'kg',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
 
             const SizedBox(height: 40),
@@ -227,6 +261,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Circular avatar that opens the photo picker when tapped.
+  Widget _buildAvatarPicker() {
+    return GestureDetector(
+      onTap: _pickAvatar,
+      child: Stack(
+        children: [
+          CircleAvatar(
+            radius: 65,
+            backgroundColor: fieldFill,
+            backgroundImage: avatarFile != null ? FileImage(avatarFile!) : null,
+            child: avatarFile == null
+                ? const Icon(Icons.person, size: 60, color: textGrey)
+                : null,
+          ),
+          Positioned(
+            bottom: 5,
+            right: 5,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: brandGreen,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.edit, color: Colors.white, size: 20),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, left: 2),
@@ -246,14 +311,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required TextEditingController controller,
     bool isEnabled = true,
     TextInputType keyboardType = TextInputType.text,
+    bool digitsOnly = false,
+    String? suffix,
   }) {
     return TextField(
       controller: controller,
       enabled: isEnabled,
       keyboardType: keyboardType,
+      inputFormatters: digitsOnly
+          ? [FilteringTextInputFormatter.digitsOnly]
+          : null,
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(color: Colors.blueGrey, fontSize: 14),
+        suffixText: suffix,
+        suffixStyle: const TextStyle(color: Colors.blueGrey, fontSize: 14),
         filled: true,
         fillColor: fieldFill,
         contentPadding: const EdgeInsets.symmetric(
