@@ -93,6 +93,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
   bool isLoading = false;
   bool agreedToTerms = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
 
   // Inline error messages
   String? _fullNameError;
@@ -326,6 +328,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   hint: 'Password',
                   controller: passwordController,
                   isPassword: true,
+                  obscureText: _obscurePassword,
+                  onToggleObscure: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
                   error: passwordController.text.isEmpty
                       ? _passwordError
                       : null,
@@ -339,6 +344,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   hint: 'Confirm Password',
                   controller: confirmController,
                   isPassword: true,
+                  obscureText: _obscureConfirm,
+                  onToggleObscure: () =>
+                      setState(() => _obscureConfirm = !_obscureConfirm),
                   error: confirmController.text.isEmpty ? _confirmError : null,
                   onClearError: () => setState(() => _confirmError = null),
                 ),
@@ -563,6 +571,8 @@ class _SignupScreenState extends State<SignupScreen> {
     required String hint,
     required TextEditingController controller,
     bool isPassword = false,
+    bool obscureText = false,
+    VoidCallback? onToggleObscure,
     String? error,
     VoidCallback? onClearError,
   }) {
@@ -573,7 +583,7 @@ class _SignupScreenState extends State<SignupScreen> {
       children: [
         TextField(
           controller: controller,
-          obscureText: isPassword,
+          obscureText: isPassword && obscureText,
           onChanged: (_) {
             // Clear this field's error as soon as user starts typing
             if (hasError && onClearError != null) onClearError();
@@ -585,6 +595,15 @@ class _SignupScreenState extends State<SignupScreen> {
               horizontal: 15,
               vertical: 12,
             ),
+            suffixIcon: isPassword && controller.text.isNotEmpty
+                ? IconButton(
+                    icon: Icon(
+                      obscureText ? Icons.visibility_off : Icons.visibility,
+                      color: textGrey,
+                    ),
+                    onPressed: onToggleObscure,
+                  )
+                : null,
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(

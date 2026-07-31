@@ -14,6 +14,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _savePassword = true;
+  bool _obscurePassword = true;
 
   final TextEditingController _userController = TextEditingController();
   final TextEditingController _passController = TextEditingController();
@@ -347,9 +348,11 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         TextField(
           controller: controller,
-          obscureText: isPassword,
+          obscureText: isPassword && _obscurePassword,
           onChanged: (_) {
             if (hasError && onClearError != null) onClearError();
+            // Rebuild so the eye icon appears once the user starts typing.
+            if (isPassword) setState(() {});
           },
           decoration: InputDecoration(
             hintText: hint,
@@ -358,6 +361,18 @@ class _LoginScreenState extends State<LoginScreen> {
               horizontal: 15,
               vertical: 12,
             ),
+            suffixIcon: isPassword && controller.text.isNotEmpty
+                ? IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                      color: textGrey,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                  )
+                : null,
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
