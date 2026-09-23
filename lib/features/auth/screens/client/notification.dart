@@ -50,9 +50,10 @@ Future<int> unreadNotificationCount() async {
   final prefs = await SharedPreferences.getInstance();
   final read = (prefs.getStringList('notifications_read_$today') ?? []).toSet();
 
-  return _NotificationScreenState._buildNotifications(logs, profile)
-      .where((n) => !read.contains(n.id))
-      .length;
+  return _NotificationScreenState._buildNotifications(
+    logs,
+    profile,
+  ).where((n) => !read.contains(n.id)).length;
 }
 
 class NotificationScreen extends StatefulWidget {

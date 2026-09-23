@@ -212,3 +212,9 @@
 - New `widgets/notification_bell.dart`: bell icon with a red count badge (9+ cap), opens Notifications and refreshes the count on return.
 - Bell replaced on Home, Meal Plan, Grocery, Track, Insights, Log Meal and Custom Food headers.
 - Not committed.
+
+## 2026-09-23 - Animated launch screen
+
+- New `screens/splash.dart`: logo scales and fades in, "Smart Plate" and the tagline rise in one after another (about 1.4s), then fades into Home or Login.
+- `main.dart`: `home` is `SplashScreen(next: ...)`, keeping the signed-in check.
+- Not committed.

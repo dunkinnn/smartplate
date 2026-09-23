@@ -545,21 +545,24 @@ class _GroceryScreenState extends State<GroceryScreen> {
               // Expanded lets a long date range wrap instead of pushing the chip off screen.
               Expanded(
                 child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    dateLabel,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: darkBlue,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      dateLabel,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: darkBlue,
+                      ),
                     ),
-                  ),
-                  Text(
-                    "$_mealCount meals, $_dayCount planned ${_dayCount == 1 ? 'day' : 'days'}",
-                    style: const TextStyle(color: textSecondary, fontSize: 13),
-                  ),
-                ],
+                    Text(
+                      "$_mealCount meals, $_dayCount planned ${_dayCount == 1 ? 'day' : 'days'}",
+                      style: const TextStyle(
+                        color: textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 12),

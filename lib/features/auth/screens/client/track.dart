@@ -299,15 +299,15 @@ class _TrackScreenState extends State<TrackScreen> {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
-                  isToday ? 'Today' : dayNames[date.weekday - 1],
-                  style: TextStyle(
-                    color: isSelected ? darkBlue : textSecondary,
-                    fontSize: 12,
-                    fontWeight: isSelected
-                        ? FontWeight.w800
-                        : FontWeight.normal,
+                    isToday ? 'Today' : dayNames[date.weekday - 1],
+                    style: TextStyle(
+                      color: isSelected ? darkBlue : textSecondary,
+                      fontSize: 12,
+                      fontWeight: isSelected
+                          ? FontWeight.w800
+                          : FontWeight.normal,
+                    ),
                   ),
-                ),
                 ),
                 const SizedBox(height: 10),
                 AnimatedContainer(
@@ -591,10 +591,7 @@ class _TrackScreenState extends State<TrackScreen> {
     ];
   }
 
-  Widget _buildTrackMealCard(
-    String title,
-    List<FoodEntry> items,
-  ) {
+  Widget _buildTrackMealCard(String title, List<FoodEntry> items) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),

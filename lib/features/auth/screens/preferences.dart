@@ -54,7 +54,10 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
         toolbarHeight: 84,
         title: const Padding(
           padding: EdgeInsets.only(right: 24),
-          child: OnboardingProgress(step: 2, title: 'Preferences & Restrictions'),
+          child: OnboardingProgress(
+            step: 2,
+            title: 'Preferences & Restrictions',
+          ),
         ),
       ),
       body: SingleChildScrollView(

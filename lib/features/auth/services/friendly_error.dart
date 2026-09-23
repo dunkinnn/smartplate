@@ -35,7 +35,8 @@ String friendlyError(Object error) {
   if (m.contains('should be different')) {
     return 'Your new password must be different from your current one.';
   }
-  if (m.contains('password') && (m.contains('weak') || m.contains('at least'))) {
+  if (m.contains('password') &&
+      (m.contains('weak') || m.contains('at least'))) {
     return 'Your password is too weak. Please follow the requirements.';
   }
   if (m.contains('expired') || (m.contains('invalid') && m.contains('token'))) {
@@ -59,8 +60,10 @@ String friendlyError(Object error) {
   if (error is PostgrestException ||
       plain.isEmpty ||
       plain.length > 120 ||
-      RegExp(r'exception|error:|null|[{}\[\]]', caseSensitive: false)
-          .hasMatch(plain)) {
+      RegExp(
+        r'exception|error:|null|[{}\[\]]',
+        caseSensitive: false,
+      ).hasMatch(plain)) {
     return 'Something went wrong. Please try again.';
   }
   return plain;

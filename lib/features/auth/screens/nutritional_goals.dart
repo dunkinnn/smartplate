@@ -15,7 +15,6 @@ class _NutritionalGoalsScreenState extends State<NutritionalGoalsScreen> {
   static const Color brandGreen = Color(0xFF67A75F);
   static const Color fieldFill = Color(0xFFF1F5F9);
   static const Color textGrey = Color(0xFF64748B);
-  static const Color darkBlue = Color(0xFF334155);
 
   final calorieController = TextEditingController();
   final targetWeightController = TextEditingController();

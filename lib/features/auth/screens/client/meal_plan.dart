@@ -303,15 +303,15 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
-                  isToday ? 'Today' : dayNames[date.weekday - 1],
-                  style: TextStyle(
-                    color: isSelected ? darkBlue : textSecondary,
-                    fontSize: 12,
-                    fontWeight: isSelected
-                        ? FontWeight.w800
-                        : FontWeight.normal,
+                    isToday ? 'Today' : dayNames[date.weekday - 1],
+                    style: TextStyle(
+                      color: isSelected ? darkBlue : textSecondary,
+                      fontSize: 12,
+                      fontWeight: isSelected
+                          ? FontWeight.w800
+                          : FontWeight.normal,
+                    ),
                   ),
-                ),
                 ),
                 const SizedBox(height: 10),
                 AnimatedContainer(

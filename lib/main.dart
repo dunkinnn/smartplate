@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'features/auth/screens/login.dart';
 import 'features/auth/screens/client/dashboard.dart';
+import 'features/auth/screens/splash.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,7 +41,10 @@ class SmartPlateApp extends StatelessWidget {
           child: child!,
         );
       },
-      home: signedIn ? const DashboardScreen() : const LoginScreen(),
+      // Animated intro, then Home or Login.
+      home: SplashScreen(
+        next: signedIn ? const DashboardScreen() : const LoginScreen(),
+      ),
     );
   }
 }
