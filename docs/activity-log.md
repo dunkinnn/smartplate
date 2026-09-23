@@ -137,3 +137,10 @@
 - `meal_plan.dart`: week status loads for that range; future days say "Not planned yet" / "You can generate this plan on that day."
 - `track.dart`: same calendar range; future days stay read-only.
 - Not committed.
+
+## 2026-09-23 - Insights uses the signup week
+
+- `insight.dart`: week range comes from `visibleDays()` (7 days from signup), same as Meal Plan and Track. Date chip uses "Sep".
+- Days Logged and the logging tip count only days up to today ("2 of 3").
+- Weekly trend labels today as "Today"; future days show as faint placeholder bars.
+- Not committed.

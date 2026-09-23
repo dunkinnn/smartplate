@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/calendar_days.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
@@ -34,12 +35,13 @@ class _InsightsScreenState extends State<InsightsScreen> {
     _loadWeek();
   }
 
-  List<DateTime> get _weekDays {
-    final now = DateTime.now();
-    return List.generate(
-      7,
-      (i) => DateTime(now.year, now.month, now.day - (6 - i)),
-    );
+  // Same 7-day week from signup as Meal Plan and Track.
+  List<DateTime> get _weekDays => visibleDays();
+
+  // Days of this week up to and including today; future days cannot be logged.
+  int get _daysSoFar {
+    final today = _key(DateTime.now());
+    return _weekDays.where((d) => _key(d).compareTo(today) <= 0).length;
   }
 
   String _key(DateTime d) =>
@@ -271,7 +273,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
       'Jun',
       'Jul',
       'Aug',
-      'Sept',
+      'Sep',
       'Oct',
       'Nov',
       'Dec',
@@ -407,7 +409,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
               const SizedBox(height: 15),
               _buildMiniStat(
                 "Days Logged",
-                "${_loggedDays.length} of 7",
+                "${_loggedDays.length} of $_daysSoFar",
                 textSecondary,
               ),
             ],
@@ -427,6 +429,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
         : (peak == 0 ? 1 : peak);
 
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final today = _key(DateTime.now());
 
     return _buildBaseCard(
       title: "Weekly Calorie Trend",
@@ -439,8 +442,11 @@ class _InsightsScreenState extends State<InsightsScreen> {
                   .map(
                     (day) => _buildBar(
                       (day.kcal / scale).clamp(0.0, 1.0),
-                      dayNames[day.date.weekday - 1],
+                      _key(day.date) == today
+                          ? 'Today'
+                          : dayNames[day.date.weekday - 1],
                       target != null && day.kcal > target,
+                      isFuture: _key(day.date).compareTo(today) > 0,
                     ),
                   )
                   .toList(),
@@ -448,7 +454,12 @@ class _InsightsScreenState extends State<InsightsScreen> {
     );
   }
 
-  Widget _buildBar(double heightFactor, String day, bool isOver) {
+  Widget _buildBar(
+    double heightFactor,
+    String day,
+    bool isOver, {
+    bool isFuture = false,
+  }) {
     return Column(
       children: [
         Container(
@@ -456,7 +467,12 @@ class _InsightsScreenState extends State<InsightsScreen> {
           height: (100 * heightFactor).clamp(4.0, 100.0),
           width: 30,
           decoration: BoxDecoration(
-            color: isOver ? accentPink : brandGreen,
+            // Days still ahead in the week are shown as a faint placeholder.
+            color: isFuture
+                ? borderColor
+                : isOver
+                ? accentPink
+                : brandGreen,
             borderRadius: BorderRadius.circular(8),
           ),
         ),
@@ -552,9 +568,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
       }
     }
 
-    if (days.length < 7) {
+    if (days.length < _daysSoFar) {
       tips.add(
-        'You logged ${days.length} of the last 7 days. More logged days make these tips more accurate.',
+        'You logged ${days.length} of $_daysSoFar days so far this week. More logged days make these tips more accurate.',
       );
     }
     return tips.take(3).toList();
