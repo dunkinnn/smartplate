@@ -6,6 +6,7 @@ import 'package:smart_plate/features/auth/services/meal_log_service.dart';
 import 'package:smart_plate/features/auth/screens/client/log_meal.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
+import 'package:smart_plate/features/auth/widgets/meal_badge.dart';
 
 class TrackScreen extends StatefulWidget {
   final VoidCallback onBackToHome;
@@ -24,12 +25,6 @@ class _TrackScreenState extends State<TrackScreen> {
   static const Color borderColor = Color(0xFFE2E8F0);
 
   static const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
-  static const mealIcons = {
-    'Breakfast': Icons.wb_sunny_outlined,
-    'Lunch': Icons.light_mode_outlined,
-    'Dinner': Icons.dark_mode_outlined,
-    'Snack': Icons.cookie_outlined,
-  };
 
   DateTime selectedDate = DateTime.now();
   Map<String, List<FoodEntry>> logsByMeal = {};
@@ -39,11 +34,22 @@ class _TrackScreenState extends State<TrackScreen> {
   // The day's generated plan by meal type, shown until the meal is eaten.
   Map<String, List<FoodEntry>> planByMeal = {};
   String? _togglingMeal;
+  int _streak = 0;
 
   @override
   void initState() {
     super.initState();
     _loadDay();
+    _loadStreak();
+  }
+
+  Future<void> _loadStreak() async {
+    try {
+      final streak = await MealLogService.currentStreak();
+      if (mounted) setState(() => _streak = streak);
+    } catch (e) {
+      debugPrint('Failed to load streak: $e');
+    }
   }
 
   String _dateKey(DateTime d) =>
@@ -148,6 +154,7 @@ class _TrackScreenState extends State<TrackScreen> {
         eaten: !_isPlanEaten(mealType),
       );
       await _loadDay(showSpinner: false);
+      await _loadStreak();
     } catch (e) {
       debugPrint('Failed to update planned meal: $e');
     }
@@ -237,7 +244,6 @@ class _TrackScreenState extends State<TrackScreen> {
                       (type) => _buildTrackMealCard(
                         type,
                         logsByMeal[type] ?? const [],
-                        mealIcons[type]!,
                       ),
                     ),
 
@@ -464,6 +470,10 @@ class _TrackScreenState extends State<TrackScreen> {
                     ),
                   ),
                 ),
+                if (_streak > 0) ...[
+                  const SizedBox(height: 10),
+                  StreakPill(days: _streak, onDark: true),
+                ],
                 if (planByMeal.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(
@@ -601,7 +611,6 @@ class _TrackScreenState extends State<TrackScreen> {
   Widget _buildTrackMealCard(
     String title,
     List<FoodEntry> items,
-    IconData icon,
   ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -615,8 +624,8 @@ class _TrackScreenState extends State<TrackScreen> {
         children: [
           Row(
             children: [
-              Icon(icon, color: textSecondary, size: 20),
-              const SizedBox(width: 10),
+              MealBadge(mealType: title),
+              const SizedBox(width: 12),
               Text(
                 title,
                 style: const TextStyle(

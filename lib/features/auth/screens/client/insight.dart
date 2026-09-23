@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/services/calendar_days.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
+import 'package:smart_plate/features/auth/widgets/meal_badge.dart';
+import 'package:smart_plate/features/auth/services/meal_log_service.dart';
 
 class InsightsScreen extends StatefulWidget {
   final VoidCallback onBackToHome;
@@ -27,12 +29,23 @@ class _InsightsScreenState extends State<InsightsScreen> {
   double? _carbsGoal;
   double? _fatGoal;
   bool _isLoading = true;
+  int _streak = 0;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _loadWeek();
+    _loadStreak();
+  }
+
+  Future<void> _loadStreak() async {
+    try {
+      final streak = await MealLogService.currentStreak();
+      if (mounted) setState(() => _streak = streak);
+    } catch (e) {
+      debugPrint('Failed to load streak: $e');
+    }
   }
 
   // Same 7-day week from signup as Meal Plan and Track.
@@ -165,7 +178,16 @@ class _InsightsScreenState extends State<InsightsScreen> {
                       child: Column(
                         children: [
                           SizedBox(height: GlassHeader.insetFor(context) + 20),
-                          _buildDateSelector(),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildDateSelector(),
+                              if (_streak > 0) ...[
+                                const SizedBox(width: 10),
+                                StreakPill(days: _streak),
+                              ],
+                            ],
+                          ),
                           const SizedBox(height: 25),
                           _buildCalorieIntakeCard(),
                           const SizedBox(height: 20),

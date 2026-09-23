@@ -24,6 +24,30 @@ class MealLogService {
     return rows.length;
   }
 
+  // Consecutive logged days, counted from today or from yesterday if today is empty.
+  static Future<int> currentStreak() async {
+    final user = _db.auth.currentUser;
+    if (user == null) return 0;
+
+    final today = DateTime.now();
+    final rows = await _db
+        .from('food_logs')
+        .select('logged_date')
+        .eq('user_id', user.id)
+        .gte('logged_date', dateKey(today.subtract(const Duration(days: 90))));
+
+    final days = {for (final r in rows) r['logged_date'] as String};
+    var day = days.contains(dateKey(today))
+        ? today
+        : today.subtract(const Duration(days: 1));
+    var streak = 0;
+    while (days.contains(dateKey(day))) {
+      streak++;
+      day = day.subtract(const Duration(days: 1));
+    }
+    return streak;
+  }
+
   // Logs a planned meal's dishes when eaten, or removes them when not.
   static Future<void> setPlannedMealEaten({
     required DateTime date,

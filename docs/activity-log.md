@@ -149,3 +149,13 @@
 
 - `dashboard.dart`: streak card under the greeting. Streak = consecutive days with at least one `food_logs` row, counted from today (or yesterday while today is not logged yet). Shows the signup-based week as dots (same as other calendars) and a short prompt. Reloads when Home is selected.
 - Not committed.
+
+## 2026-09-23 - Home look carried to other tabs
+
+- New `widgets/meal_badge.dart`: `mealStyle`, `MealBadge` (Home's tinted meal icon tile) and `StreakPill`.
+- `MealLogService.currentStreak()`: same streak rule as Home.
+- Track: meal cards use MealBadge; calorie card shows the streak pill.
+- Grocery: meal sections use MealBadge with the meal name as a heading.
+- Insights: streak pill beside the week date chip.
+- Home unchanged.
+- Not committed.

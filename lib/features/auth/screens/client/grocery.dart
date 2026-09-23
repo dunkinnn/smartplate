@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
+import 'package:smart_plate/features/auth/widgets/meal_badge.dart';
 
 // --- MODEL ---
 // One ingredient on the week's list, backed by one grocery_items row per plan.
@@ -626,16 +627,17 @@ class _GroceryScreenState extends State<GroceryScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 30, bottom: 12, left: 4),
+          padding: const EdgeInsets.only(top: 28, bottom: 12, left: 4),
           child: Row(
             children: [
+              MealBadge(mealType: meal, size: 32),
+              const SizedBox(width: 10),
               Text(
-                meal.toUpperCase(),
+                meal,
                 style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: textSecondary,
-                  fontSize: 12,
-                  letterSpacing: 2.0,
+                  fontWeight: FontWeight.w900,
+                  color: darkBlue,
+                  fontSize: 16,
                 ),
               ),
               const Spacer(),
