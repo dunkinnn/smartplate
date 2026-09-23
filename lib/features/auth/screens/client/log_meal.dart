@@ -192,57 +192,57 @@ class _LogMealScreenState extends State<LogMealScreen> {
               children: [
                 SizedBox(height: GlassHeader.insetFor(context) + 15),
                 _buildHorizontalCalendar(),
-                    const SizedBox(height: 30),
+                const SizedBox(height: 30),
 
-                    const Text(
-                      "SELECT MEAL",
-                      style: TextStyle(
-                        color: textSecondary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.5,
+                const Text(
+                  "SELECT MEAL",
+                  style: TextStyle(
+                    color: textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildMealTypeChips(),
+
+                const SizedBox(height: 25),
+                _buildSearchBar(),
+                _buildSavedFoodResults(),
+
+                const SizedBox(height: 30),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      selectedMealType,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: darkBlue,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildMealTypeChips(),
-
-                    const SizedBox(height: 25),
-                    _buildSearchBar(),
-                    _buildSavedFoodResults(),
-
-                    const SizedBox(height: 30),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          selectedMealType,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: darkBlue,
-                          ),
-                        ),
-                        Text(
-                          "$_totalKcal kcal total",
-                          style: const TextStyle(
-                            color: brandGreen,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 15),
-
-                    if (stagedFoods.isEmpty)
-                      _buildEmptyState()
-                    else
-                      ...stagedFoods.asMap().entries.map(
-                        (entry) => _buildFoodItem(entry.key, entry.value),
+                    Text(
+                      "$_totalKcal kcal total",
+                      style: const TextStyle(
+                        color: brandGreen,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
                       ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 15),
 
-                    const SizedBox(height: 12),
-                    _buildCustomButton("Add Custom Food", Icons.add_rounded),
+                if (stagedFoods.isEmpty)
+                  _buildEmptyState()
+                else
+                  ...stagedFoods.asMap().entries.map(
+                    (entry) => _buildFoodItem(entry.key, entry.value),
+                  ),
+
+                const SizedBox(height: 12),
+                _buildCustomButton("Add Custom Food", Icons.add_rounded),
 
                 const SizedBox(height: 35),
                 _buildSummaryCard(),
@@ -739,9 +739,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
     final message = _message;
     if (message == null) return const SizedBox.shrink();
 
-    final accent = _messageIsError
-        ? const Color(0xFFF25151)
-        : brandGreen;
+    final accent = _messageIsError ? const Color(0xFFF25151) : brandGreen;
 
     return Padding(
       padding: const EdgeInsets.only(top: 20),

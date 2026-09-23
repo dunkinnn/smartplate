@@ -209,7 +209,8 @@ class _GroceryScreenState extends State<GroceryScreen> {
         agg.add(part);
       }
       ids.putIfAbsent(key, () => []).add(r['id'] as String);
-      bought[key] = (bought[key] ?? true) && (r['is_checked'] as bool? ?? false);
+      bought[key] =
+          (bought[key] ?? true) && (r['is_checked'] as bool? ?? false);
     }
 
     return [
@@ -371,7 +372,8 @@ class _GroceryScreenState extends State<GroceryScreen> {
                       children: [
                         _buildDateHeader(),
                         ...sortedCategories.map(
-                          (meal) => _buildMealSection(meal, groupedItems[meal]!),
+                          (meal) =>
+                              _buildMealSection(meal, groupedItems[meal]!),
                         ),
                         const SizedBox(height: 24),
                         _buildFooter(),
@@ -571,7 +573,10 @@ class _GroceryScreenState extends State<GroceryScreen> {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: brandGreen,
                   borderRadius: BorderRadius.circular(10),

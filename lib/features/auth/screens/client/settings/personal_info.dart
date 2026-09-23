@@ -250,10 +250,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         const SizedBox(height: 6),
         const Text(
           "Email is tied to your login and cannot be changed here.",
-          style: TextStyle(
-            fontSize: 11,
-            color: SettingsScaffold.textSecondary,
-          ),
+          style: TextStyle(fontSize: 11, color: SettingsScaffold.textSecondary),
         ),
         const SizedBox(height: 20),
 

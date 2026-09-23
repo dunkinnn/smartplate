@@ -133,60 +133,60 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
               children: [
                 SizedBox(height: GlassHeader.insetFor(context) + 25),
                 _buildSectionHeader("BASIC INFORMATION"),
-                    _buildInputField(
-                      "Food Name",
-                      "e.g. Homemade Pancake",
-                      Icons.restaurant_menu_rounded,
-                      nameController,
+                _buildInputField(
+                  "Food Name",
+                  "e.g. Homemade Pancake",
+                  Icons.restaurant_menu_rounded,
+                  nameController,
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildInputField(
+                        "Quantity",
+                        "100g",
+                        Icons.scale_rounded,
+                        quantityController,
+                      ),
                     ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildInputField(
-                            "Quantity",
-                            "100g",
-                            Icons.scale_rounded,
-                            quantityController,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildInputField(
-                            "Calories",
-                            "220 kcal",
-                            Icons.local_fire_department_rounded,
-                            caloriesController,
-                            isNumeric: true,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildInputField(
+                        "Calories",
+                        "220 kcal",
+                        Icons.local_fire_department_rounded,
+                        caloriesController,
+                        isNumeric: true,
+                      ),
                     ),
-                    const SizedBox(height: 35),
-                    _buildSectionHeader("MACRONUTRIENTS (OPTIONAL)"),
-                    _buildInputField(
-                      "Protein",
-                      "0g",
-                      Icons.fitness_center_rounded,
-                      proteinController,
-                      isNumeric: true,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInputField(
-                      "Carbohydrates",
-                      "0g",
-                      Icons.bakery_dining_rounded,
-                      carbsController,
-                      isNumeric: true,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInputField(
-                      "Fats",
-                      "0g",
-                      Icons.water_drop_rounded,
-                      fatController,
-                      isNumeric: true,
-                    ),
+                  ],
+                ),
+                const SizedBox(height: 35),
+                _buildSectionHeader("MACRONUTRIENTS (OPTIONAL)"),
+                _buildInputField(
+                  "Protein",
+                  "0g",
+                  Icons.fitness_center_rounded,
+                  proteinController,
+                  isNumeric: true,
+                ),
+                const SizedBox(height: 16),
+                _buildInputField(
+                  "Carbohydrates",
+                  "0g",
+                  Icons.bakery_dining_rounded,
+                  carbsController,
+                  isNumeric: true,
+                ),
+                const SizedBox(height: 16),
+                _buildInputField(
+                  "Fats",
+                  "0g",
+                  Icons.water_drop_rounded,
+                  fatController,
+                  isNumeric: true,
+                ),
                 const SizedBox(height: 24),
                 _buildSaveToLibraryToggle(),
                 _buildMessageBanner(),

@@ -41,7 +41,9 @@ class _NutritionalGoalsScreenState extends State<NutritionalGoalsScreen> {
         selectedActivityLevel == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please fill in calorie target, goal, and activity level.'),
+          content: Text(
+            'Please fill in calorie target, goal, and activity level.',
+          ),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -51,21 +53,20 @@ class _NutritionalGoalsScreenState extends State<NutritionalGoalsScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (context) => ReviewConfirmScreen(
-              allData: {
-                ...widget.profileData,
-                'calorie_target': int.tryParse(calorieController.text.trim()),
-                'weight_goal': selectedWeightGoal,
-                'target_weight': double.tryParse(
-                  targetWeightController.text.trim(),
-                ),
-                'activity_level': selectedActivityLevel,
-                'protein_goal_g': int.tryParse(proteinController.text.trim()),
-                'carbs_goal_g': int.tryParse(carbsController.text.trim()),
-                'fat_goal_g': int.tryParse(fatController.text.trim()),
-              },
+        builder: (context) => ReviewConfirmScreen(
+          allData: {
+            ...widget.profileData,
+            'calorie_target': int.tryParse(calorieController.text.trim()),
+            'weight_goal': selectedWeightGoal,
+            'target_weight': double.tryParse(
+              targetWeightController.text.trim(),
             ),
+            'activity_level': selectedActivityLevel,
+            'protein_goal_g': int.tryParse(proteinController.text.trim()),
+            'carbs_goal_g': int.tryParse(carbsController.text.trim()),
+            'fat_goal_g': int.tryParse(fatController.text.trim()),
+          },
+        ),
       ),
     );
   }
@@ -253,13 +254,11 @@ class _NutritionalGoalsScreenState extends State<NutritionalGoalsScreen> {
             hint,
             style: const TextStyle(color: Colors.blueGrey, fontSize: 14),
           ),
-          items:
-              items
-                  .map(
-                    (val) =>
-                        DropdownMenuItem<String>(value: val, child: Text(val)),
-                  )
-                  .toList(),
+          items: items
+              .map(
+                (val) => DropdownMenuItem<String>(value: val, child: Text(val)),
+              )
+              .toList(),
           onChanged: onChanged,
           icon: const Icon(Icons.arrow_drop_down, color: Colors.black),
         ),

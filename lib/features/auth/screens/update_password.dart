@@ -37,11 +37,12 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
 
     setState(() {
       _authError = null;
-      
+
       if (password.isEmpty) {
         _passwordError = 'Password is required.';
       } else if (!_isStrongPassword(password)) {
-        _passwordError = 'Must be 6+ chars with uppercase, lowercase, number & symbol.';
+        _passwordError =
+            'Must be 6+ chars with uppercase, lowercase, number & symbol.';
       } else {
         _passwordError = null;
       }
@@ -68,7 +69,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
       if (mounted) {
         // Sign out automatically after password reset for security, forcing them to log in again
         await Supabase.instance.client.auth.signOut();
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -148,7 +149,10 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
                 Container(
                   width: double.infinity,
                   margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: errorRed.withAlpha(20),
                     borderRadius: BorderRadius.circular(8),
@@ -156,7 +160,11 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: errorRed, size: 18),
+                      const Icon(
+                        Icons.error_outline,
+                        color: errorRed,
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -174,7 +182,8 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
                 error: _passwordError,
                 isPassword: true,
                 obscure: _obscurePassword,
-                onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
+                onToggleObscure: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
                 onClearError: () => setState(() => _passwordError = null),
               ),
               const SizedBox(height: 15),
@@ -184,7 +193,8 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
                 error: _confirmError,
                 isPassword: true,
                 obscure: _obscureConfirm,
-                onToggleObscure: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                onToggleObscure: () =>
+                    setState(() => _obscureConfirm = !_obscureConfirm),
                 onClearError: () => setState(() => _confirmError = null),
               ),
               const SizedBox(height: 30),
@@ -252,14 +262,22 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
                     onPressed: onToggleObscure,
                   )
                 : null,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 15,
+              vertical: 14,
+            ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: hasError ? errorRed : const Color(0xFFD1D5DB)),
+              borderSide: BorderSide(
+                color: hasError ? errorRed : const Color(0xFFD1D5DB),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: hasError ? errorRed : brandGreen, width: 2),
+              borderSide: BorderSide(
+                color: hasError ? errorRed : brandGreen,
+                width: 2,
+              ),
             ),
           ),
         ),

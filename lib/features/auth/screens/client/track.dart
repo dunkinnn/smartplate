@@ -161,7 +161,9 @@ class _TrackScreenState extends State<TrackScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Remove this food?'),
-        content: Text('${item.name} (${item.kcal} kcal) will be removed from your log.'),
+        content: Text(
+          '${item.name} (${item.kcal} kcal) will be removed from your log.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -169,7 +171,9 @@ class _TrackScreenState extends State<TrackScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: const Color(0xFFF25151)),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFF25151),
+            ),
             child: const Text('Remove'),
           ),
         ],
@@ -192,10 +196,8 @@ class _TrackScreenState extends State<TrackScreen> {
     final saved = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => LogMealScreen(
-          initialDate: selectedDate,
-          initialMealType: mealType,
-        ),
+        builder: (context) =>
+            LogMealScreen(initialDate: selectedDate, initialMealType: mealType),
       ),
     );
     if (saved == true) _loadDay();
@@ -283,7 +285,7 @@ class _TrackScreenState extends State<TrackScreen> {
     );
   }
 
-  // The past six days and today.
+  // The current 7-day week from signup.
   Widget _buildHorizontalCalendar() {
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final today = DateTime.now();
@@ -301,55 +303,57 @@ class _TrackScreenState extends State<TrackScreen> {
         return Padding(
           padding: EdgeInsets.only(right: days.length == 7 ? 0 : 12),
           child: GestureDetector(
-          onTap: () {
-            setState(() => selectedDate = date);
-            _loadDay();
-          },
-          child: Column(
-            children: [
-              Text(
-                isToday ? 'Today' : dayNames[date.weekday - 1],
-                style: TextStyle(
-                  color: isSelected ? darkBlue : textSecondary,
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.normal,
-                ),
-              ),
-              const SizedBox(height: 10),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected ? brandGreen : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected ? brandGreen : borderColor,
-                    width: 1,
-                  ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: brandGreen.withValues(alpha: 0.2),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : [],
-                ),
-                child: Text(
-                  '${date.day}',
+            onTap: () {
+              setState(() => selectedDate = date);
+              _loadDay();
+            },
+            child: Column(
+              children: [
+                Text(
+                  isToday ? 'Today' : dayNames[date.weekday - 1],
                   style: TextStyle(
-                    color: isSelected ? Colors.white : textMain,
-                    fontWeight: FontWeight.w700,
+                    color: isSelected ? darkBlue : textSecondary,
+                    fontSize: 12,
+                    fontWeight: isSelected
+                        ? FontWeight.w800
+                        : FontWeight.normal,
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected ? brandGreen : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected ? brandGreen : borderColor,
+                      width: 1,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: brandGreen.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : [],
+                  ),
+                  child: Text(
+                    '${date.day}',
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : textMain,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
         );
       }).toList(),
     );
@@ -649,48 +653,50 @@ class _TrackScreenState extends State<TrackScreen> {
               ),
             )
           else
-            ...items.where((f) => f.source != 'plan').map(
-              (item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item.quantity.isEmpty
-                            ? item.name
-                            : "${item.name} (${item.quantity})",
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: darkBlue,
-                          fontWeight: FontWeight.w500,
+            ...items
+                .where((f) => f.source != 'plan')
+                .map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.quantity.isEmpty
+                                ? item.name
+                                : "${item.name} (${item.quantity})",
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: darkBlue,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    Text(
-                      "${item.kcal} kcal",
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    // Hand-logged foods can be removed on the same day only.
-                    if (_isToday && item.id != null)
-                      IconButton(
-                        tooltip: 'Remove',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () => _confirmDelete(item),
-                        icon: const Icon(
-                          Icons.delete_outline_rounded,
-                          color: textSecondary,
-                          size: 20,
+                        Text(
+                          "${item.kcal} kcal",
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                  ],
+                        // Hand-logged foods can be removed on the same day only.
+                        if (_isToday && item.id != null)
+                          IconButton(
+                            tooltip: 'Remove',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => _confirmDelete(item),
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: textSecondary,
+                              size: 20,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
           // Extra foods can only be logged for today.
           if (_isToday) ...[
             const SizedBox(height: 16),
@@ -699,7 +705,11 @@ class _TrackScreenState extends State<TrackScreen> {
               height: 44,
               child: TextButton.icon(
                 onPressed: () => _openLogMeal(title),
-                icon: const Icon(Icons.add_rounded, color: brandGreen, size: 18),
+                icon: const Icon(
+                  Icons.add_rounded,
+                  color: brandGreen,
+                  size: 18,
+                ),
                 label: const Text(
                   "Log Item",
                   style: TextStyle(

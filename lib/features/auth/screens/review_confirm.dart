@@ -152,7 +152,10 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
             if (avatar is File)
               Padding(
                 padding: const EdgeInsets.only(bottom: 20),
-                child: CircleAvatar(radius: 50, backgroundImage: FileImage(avatar)),
+                child: CircleAvatar(
+                  radius: 50,
+                  backgroundImage: FileImage(avatar),
+                ),
               ),
 
             _buildReviewSection(
@@ -214,17 +217,16 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
                   ),
                   elevation: 0,
                 ),
-                child:
-                    isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                          'Save & Continue',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                          ),
+                child: isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        'Save & Continue',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
                         ),
+                      ),
               ),
             ),
             const SizedBox(height: 30),
@@ -315,9 +317,7 @@ class _SuccessSequenceDialogState extends State<SuccessSequenceDialog> {
           if (mounted) {
             navigator.pop(); // Close the dialog
             navigator.pushAndRemoveUntil(
-              MaterialPageRoute(
-                builder: (context) => const DashboardScreen(),
-              ),
+              MaterialPageRoute(builder: (context) => const DashboardScreen()),
               (route) => false,
             );
           }
@@ -344,11 +344,7 @@ class _SuccessSequenceDialogState extends State<SuccessSequenceDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.check_circle,
-              color: Color(0xFF67A75F),
-              size: 80,
-            ),
+            const Icon(Icons.check_circle, color: Color(0xFF67A75F), size: 80),
             const SizedBox(height: 20),
             const Text(
               'Information Saved!',

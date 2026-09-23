@@ -35,6 +35,9 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
 
   bool get _isToday => _dateKey(selectedDate) == _dateKey(DateTime.now());
 
+  bool get _isFuture =>
+      _dateKey(selectedDate).compareTo(_dateKey(DateTime.now())) > 0;
+
   // Goals the plan is measured against, from user_profiles.
   Map<String, dynamic> _goals = {};
 
@@ -67,13 +70,13 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     setState(() => isLoading = true);
 
     try {
-      final today = DateTime.now();
+      final days = visibleDays();
       final week = await supabase
           .from('meal_plans')
           .select('plan_date, saved_at')
           .eq('user_id', user.id)
-          .gte('plan_date', _dateKey(today.subtract(const Duration(days: 6))))
-          .lte('plan_date', _dateKey(today));
+          .gte('plan_date', _dateKey(days.first))
+          .lte('plan_date', _dateKey(days.last));
 
       final goals = await supabase
           .from('user_profiles')
@@ -170,9 +173,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(
-          () => _message = e.toString().replaceFirst('Exception: ', ''),
-        );
+        setState(() => _message = e.toString().replaceFirst('Exception: ', ''));
       }
     }
 
@@ -303,7 +304,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     );
   }
 
-  // The past six days and today; only today can be generated.
+  // The current 7-day week from signup; only today can be generated.
   Widget _buildHorizontalCalendar() {
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final today = DateTime.now();
@@ -321,72 +322,74 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         return Padding(
           padding: EdgeInsets.only(right: days.length == 7 ? 0 : 12),
           child: GestureDetector(
-          onTap: () {
-            setState(() => selectedDate = date);
-            _loadPlan();
-          },
-          child: Column(
-            children: [
-              Text(
-                isToday ? 'Today' : dayNames[date.weekday - 1],
-                style: TextStyle(
-                  color: isSelected ? darkBlue : textSecondary,
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.normal,
-                ),
-              ),
-              const SizedBox(height: 10),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected ? brandGreen : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected ? brandGreen : borderColor,
-                    width: 1,
-                  ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: brandGreen.withValues(alpha: 0.2),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : [],
-                ),
-                child: Text(
-                  '${date.day}',
+            onTap: () {
+              setState(() => selectedDate = date);
+              _loadPlan();
+            },
+            child: Column(
+              children: [
+                Text(
+                  isToday ? 'Today' : dayNames[date.weekday - 1],
                   style: TextStyle(
-                    color: isSelected ? Colors.white : textMain,
-                    fontWeight: FontWeight.w700,
+                    color: isSelected ? darkBlue : textSecondary,
+                    fontSize: 12,
+                    fontWeight: isSelected
+                        ? FontWeight.w800
+                        : FontWeight.normal,
                   ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              // Green dot for a confirmed plan, outlined dot for a draft plan.
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: _weekStatus[_dateKey(date)] == 'confirmed'
-                      ? brandGreen
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: _weekStatus.containsKey(_dateKey(date))
+                const SizedBox(height: 10),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected ? brandGreen : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected ? brandGreen : borderColor,
+                      width: 1,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: brandGreen.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : [],
+                  ),
+                  child: Text(
+                    '${date.day}',
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : textMain,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                // Green dot for a confirmed plan, outlined dot for a draft plan.
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _weekStatus[_dateKey(date)] == 'confirmed'
                         ? brandGreen
                         : Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _weekStatus.containsKey(_dateKey(date))
+                          ? brandGreen
+                          : Colors.transparent,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
         );
       }).toList(),
     );
@@ -411,11 +414,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(
-              Icons.error_outline_rounded,
-              color: accent,
-              size: 20,
-            ),
+            const Icon(Icons.error_outline_rounded, color: accent, size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -450,7 +449,11 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         const Icon(Icons.restaurant_menu_rounded, size: 48, color: borderColor),
         const SizedBox(height: 16),
         Text(
-          _isToday ? "No plan for today yet" : "No plan was made for this day",
+          _isToday
+              ? "No plan for today yet"
+              : _isFuture
+              ? "Not planned yet"
+              : "No plan was made for this day",
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w900,
@@ -461,6 +464,8 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         Text(
           _isToday
               ? "Generate one from your goals, diet and allergies."
+              : _isFuture
+              ? "You can generate this plan on that day."
               : "Meal plans can only be generated for the current day.",
           textAlign: TextAlign.center,
           style: TextStyle(
@@ -513,7 +518,6 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
   // Regenerate and Use this plan side by side, or a confirmed banner.
   Widget _buildPlanActions() {
     if (isSaved) {
-
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
@@ -614,7 +618,10 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           ),
         ),
         style: OutlinedButton.styleFrom(
-          side: BorderSide(color: brandGreen.withValues(alpha: 0.5), width: 1.5),
+          side: BorderSide(
+            color: brandGreen.withValues(alpha: 0.5),
+            width: 1.5,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),

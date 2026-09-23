@@ -130,3 +130,10 @@
 - New `services/calendar_days.dart`: `visibleDays()` returns up to the past 6 days and today, never before the account's creation date.
 - `meal_plan.dart`, `track.dart`: calendars use it; fewer than 7 days are left-aligned with spacing. A new user sees only Today.
 - Not committed.
+
+## 2026-09-23 - Calendar weeks start at signup
+
+- `services/calendar_days.dart`: `visibleDays()` returns a 7-day week starting on the signup day (days 1-7, then 8-14, ...), always containing today.
+- `meal_plan.dart`: week status loads for that range; future days say "Not planned yet" / "You can generate this plan on that day."
+- `track.dart`: same calendar range; future days stay read-only.
+- Not committed.

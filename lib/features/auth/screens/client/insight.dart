@@ -118,8 +118,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
 
   // Only days with entries count, so one logged day does not read as a
   // seventh of itself.
-  List<_DayTotals> get _loggedDays =>
-      _week.where((d) => d.kcal > 0).toList();
+  List<_DayTotals> get _loggedDays => _week.where((d) => d.kcal > 0).toList();
 
   int get _avgKcal {
     final days = _loggedDays;
@@ -423,7 +422,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
     // the week's own peak when no goal exists.
     final target = _calorieTarget;
     final peak = _week.fold(0, (m, d) => d.kcal > m ? d.kcal : m);
-    final scale = (target != null && target > 0) ? target : (peak == 0 ? 1 : peak);
+    final scale = (target != null && target > 0)
+        ? target
+        : (peak == 0 ? 1 : peak);
 
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 

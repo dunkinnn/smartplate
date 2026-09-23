@@ -25,16 +25,15 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (context) => NutritionalGoalsScreen(
-              profileData: {
-                ...widget.profileData,
-                'diet': selectedDiet,
-                'taste': selectedTaste,
-                'allergen': selectedAllergen,
-                'food_restriction': selectedRestriction,
-              },
-            ),
+        builder: (context) => NutritionalGoalsScreen(
+          profileData: {
+            ...widget.profileData,
+            'diet': selectedDiet,
+            'taste': selectedTaste,
+            'allergen': selectedAllergen,
+            'food_restriction': selectedRestriction,
+          },
+        ),
       ),
     );
   }
@@ -118,13 +117,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
             _buildDropdownField(
               hint: 'Select foods you avoid',
               value: selectedRestriction,
-              items: [
-                'None',
-                'Pork',
-                'Beef',
-                'Alcohol',
-                'Processed Sugar',
-              ],
+              items: ['None', 'Pork', 'Beef', 'Alcohol', 'Processed Sugar'],
               onChanged: (val) => setState(() => selectedRestriction = val),
             ),
 
@@ -192,13 +185,11 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
             hint,
             style: const TextStyle(color: Colors.blueGrey, fontSize: 14),
           ),
-          items:
-              items
-                  .map(
-                    (val) =>
-                        DropdownMenuItem<String>(value: val, child: Text(val)),
-                  )
-                  .toList(),
+          items: items
+              .map(
+                (val) => DropdownMenuItem<String>(value: val, child: Text(val)),
+              )
+              .toList(),
           onChanged: onChanged,
           icon: const Icon(Icons.arrow_drop_down, color: Colors.black),
         ),

@@ -78,12 +78,7 @@ class GlassHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     // Pinned to the top edge so it spans the full width regardless of the
     // constraints the surrounding Stack hands out.
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: _buildBar(),
-    );
+    return Positioned(top: 0, left: 0, right: 0, child: _buildBar());
   }
 
   Widget _buildBar() {
