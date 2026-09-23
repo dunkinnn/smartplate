@@ -81,3 +81,25 @@
 - `meal_plan.dart`: today's confirmed plan shows an eaten circle on each meal card, using `MealLogService`, so Meal Plan, Home and Track stay in sync. Future days show no circle.
 - `dashboard.dart`: Meal Plan also reloads when its tab is selected.
 - Not committed.
+
+## 2026-09-23 - Remove eaten circle from Home
+
+- `dashboard.dart`: Today's Meal Plan on Home is display-only again; it keeps the "planned" / "eaten" label. Meals are marked eaten on Meal Plan or Track.
+- Not committed.
+
+## 2026-09-23 - Grocery restructure
+
+- `grocery.dart`: header card shows date range, item count and a "X of Y bought" progress bar.
+- Each meal section lists items still to buy first, with bought items folded into a "Bought (n)" row and an x/y count.
+- Floating "Finish Shopping" button and "All Set!" popup removed. The end of the list has "Mark all as bought (n left)", which becomes a "Shopping done" card with "Start over" (unchecks everything).
+- Not committed.
+
+## 2026-09-23 - Grocery date label
+
+- `grocery.dart`: header shows the actual planned days on the list (one date, or first - last) instead of a fixed "Today to +6" range; "Sept" corrected to "Sep"; day count pluralized.
+- Not committed.
+
+## 2026-09-23 - Remove hand-logged foods on Track
+
+- `track.dart`: today's hand-logged foods have a delete icon; a confirm dialog removes the `food_logs` row (uses the delete policy from `food-logs-delete-policy.sql`). Planned meals are undone by tapping them instead.
+- Not committed.

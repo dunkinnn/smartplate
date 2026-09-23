@@ -2,8 +2,6 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:smart_plate/features/auth/models/food_entry.dart';
-import 'package:smart_plate/features/auth/services/meal_log_service.dart';
 import 'package:smart_plate/features/auth/screens/client/grocery.dart';
 import 'package:smart_plate/features/auth/screens/client/insight.dart';
 import 'package:smart_plate/features/auth/screens/client/meal_plan.dart';
@@ -43,7 +41,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Planned meal types already marked as eaten today.
   Set<String> _eatenPlanMeals = {};
-  String? _togglingMeal;
 
   @override
   void initState() {
@@ -81,7 +78,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       final items = await supabase
           .from('meal_plan_items')
-          .select('meal_type, name, kcal, protein_g, carbs_g, fat_g')
+          .select('meal_type, name, kcal')
           .eq('plan_id', plan['id'])
           .order('sort_order');
 
@@ -126,29 +123,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e) {
       debugPrint('Failed to load today\'s logs: $e');
     }
-  }
-
-  // One-tap "Ate this" for a planned meal; Track shows the same state.
-  Future<void> _toggleEaten(String mealType) async {
-    if (_togglingMeal != null) return;
-    setState(() => _togglingMeal = mealType);
-
-    try {
-      await MealLogService.setPlannedMealEaten(
-        date: DateTime.now(),
-        mealType: mealType,
-        dishes: [
-          for (final item in _todayPlan)
-            if (item['meal_type'] == mealType) FoodEntry.fromPlanItem(item),
-        ],
-        eaten: !_eatenPlanMeals.contains(mealType),
-      );
-      await _loadTodayLogs();
-    } catch (e) {
-      debugPrint('Failed to update eaten meal: $e');
-    }
-
-    if (mounted) setState(() => _togglingMeal = null);
   }
 
   // Share of the calorie target consumed today, 0 when no goal is set.
@@ -485,14 +459,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 "${(item['kcal'] as num?)?.round() ?? 0} kcal",
               ),
             ),
-          if (_todayPlan.isNotEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 4),
-              child: Text(
-                "Tap the circle when you have eaten a meal.",
-                style: TextStyle(fontSize: 12, color: textSecondary),
-              ),
-            ),
+
           const SizedBox(height: 30),
         ],
       ),
@@ -727,7 +694,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildMealItem(String title, String dish, String kcal) {
     final (icon, accentColor) = _mealStyle(title);
     final eaten = _eatenPlanMeals.contains(title);
-    final busy = _togglingMeal == title;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -788,27 +754,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
             ],
-          ),
-          const SizedBox(width: 6),
-          IconButton(
-            tooltip: eaten ? 'Mark as not eaten' : 'Ate this',
-            onPressed: busy ? null : () => _toggleEaten(title),
-            icon: busy
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: brandGreen,
-                    ),
-                  )
-                : Icon(
-                    eaten
-                        ? Icons.check_circle_rounded
-                        : Icons.radio_button_unchecked_rounded,
-                    color: eaten ? brandGreen : textSecondary,
-                    size: 26,
-                  ),
           ),
         ],
       ),

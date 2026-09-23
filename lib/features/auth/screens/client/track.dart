@@ -154,6 +154,39 @@ class _TrackScreenState extends State<TrackScreen> {
     if (mounted) setState(() => _togglingMeal = null);
   }
 
+  // Asks before removing a hand-logged food, then deletes its food_logs row.
+  Future<void> _confirmDelete(FoodEntry item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove this food?'),
+        content: Text('${item.name} (${item.kcal} kcal) will be removed from your log.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFFF25151)),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await Supabase.instance.client
+          .from('food_logs')
+          .delete()
+          .eq('id', item.id!);
+      await _loadDay(showSpinner: false);
+    } catch (e) {
+      debugPrint('Failed to remove food: $e');
+    }
+  }
+
   Future<void> _openLogMeal(String mealType) async {
     final saved = await Navigator.push<bool>(
       context,
@@ -648,6 +681,18 @@ class _TrackScreenState extends State<TrackScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    // Hand-logged foods can be removed on the same day only.
+                    if (_isToday && item.id != null)
+                      IconButton(
+                        tooltip: 'Remove',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _confirmDelete(item),
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: textSecondary,
+                          size: 20,
+                        ),
+                      ),
                   ],
                 ),
               ),

@@ -51,6 +51,16 @@ class _GroceryScreenState extends State<GroceryScreen> {
   List<GroceryItem> _items = [];
   int _mealCount = 0;
   int _dayCount = 0;
+
+  // Earliest and latest planned days on the list, for the header label.
+  DateTime? _firstDay;
+  DateTime? _lastDay;
+  bool _isUpdatingAll = false;
+
+  // Meal sections whose bought items are expanded.
+  final Set<String> _showBought = {};
+
+  int get _boughtCount => _items.where((i) => i.isBought).length;
   bool _isLoading = true;
   bool _hasPlan = false;
   String? _error;
@@ -93,13 +103,16 @@ class _GroceryScreenState extends State<GroceryScreen> {
       // Without a timeout a stalled request leaves the spinner up forever.
       final plans = await supabase
           .from('meal_plans')
-          .select('id')
+          .select('id, plan_date')
           .eq('user_id', user.id)
           .gte('plan_date', _dateKey(today))
           .lte('plan_date', _dateKey(today.add(const Duration(days: 6))))
           .timeout(const Duration(seconds: 10));
 
       final planIds = [for (final p in plans) p['id'] as String];
+      final planDays = [
+        for (final p in plans) DateTime.parse(p['plan_date'] as String),
+      ]..sort();
 
       if (planIds.isEmpty) {
         if (!mounted) return;
@@ -153,6 +166,8 @@ class _GroceryScreenState extends State<GroceryScreen> {
         _items = _merge(rows);
         _mealCount = planItems.length;
         _dayCount = planIds.length;
+        _firstDay = planDays.first;
+        _lastDay = planDays.last;
         _hasPlan = true;
         _isLoading = false;
       });
@@ -264,31 +279,30 @@ class _GroceryScreenState extends State<GroceryScreen> {
         );
   }
 
-  // Checks off everything left, then confirms the trip is done.
-  Future<void> _finishShopping() async {
-    final remaining = _items.where((i) => !i.isBought).toList();
-    final ids = [for (final i in remaining) ...i.ids];
+  // Marks every item bought, or unchecks everything to start over.
+  Future<void> _setAll(bool bought) async {
+    final targets = _items.where((i) => i.isBought != bought).toList();
+    final ids = [for (final i in targets) ...i.ids];
+    if (ids.isEmpty || _isUpdatingAll) return;
 
-    if (ids.isNotEmpty) {
-      try {
-        await Supabase.instance.client
-            .from('grocery_items')
-            .update({'is_checked': true})
-            .inFilter('id', ids);
-        if (mounted) {
-          setState(() {
-            for (final i in remaining) {
-              i.isBought = true;
-            }
-          });
-        }
-      } catch (e) {
-        debugPrint('Failed to finish shopping: $e');
-        return;
+    setState(() => _isUpdatingAll = true);
+    try {
+      await Supabase.instance.client
+          .from('grocery_items')
+          .update({'is_checked': bought})
+          .inFilter('id', ids);
+      if (mounted) {
+        setState(() {
+          for (final i in targets) {
+            i.isBought = bought;
+          }
+          if (!bought) _showBought.clear();
+        });
       }
+    } catch (e) {
+      debugPrint('Failed to update grocery list: $e');
     }
-
-    if (mounted) _showSuccessModal();
+    if (mounted) setState(() => _isUpdatingAll = false);
   }
 
   Future<void> _toggleItem(GroceryItem item, bool value) async {
@@ -356,33 +370,12 @@ class _GroceryScreenState extends State<GroceryScreen> {
                       ),
                       children: [
                         _buildDateHeader(),
-                        ...sortedCategories.map((category) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  top: 30,
-                                  bottom: 12,
-                                  left: 4,
-                                ),
-                                child: Text(
-                                  category.toUpperCase(),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: textSecondary,
-                                    fontSize: 12,
-                                    letterSpacing: 2.0,
-                                  ),
-                                ),
-                              ),
-                              ...groupedItems[category]!.map(
-                                (item) => _buildGroceryTile(item),
-                              ),
-                            ],
-                          );
-                        }),
-                        const SizedBox(height: 100), // Space for button
+                        ...sortedCategories.map(
+                          (meal) => _buildMealSection(meal, groupedItems[meal]!),
+                        ),
+                        const SizedBox(height: 24),
+                        _buildFooter(),
+                        const SizedBox(height: 40),
                       ],
                     ),
                   ),
@@ -390,10 +383,6 @@ class _GroceryScreenState extends State<GroceryScreen> {
           _buildAppBar(),
         ],
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: (_hasPlan && _items.isNotEmpty)
-          ? _buildCompleteButton()
-          : null,
     );
   }
 
@@ -519,7 +508,8 @@ class _GroceryScreenState extends State<GroceryScreen> {
     );
   }
 
-  Widget _buildDateHeader() {
+  // "Wed, Sep 23", or a range when several days are planned.
+  String _formatDay(DateTime d) {
     const months = [
       'Jan',
       'Feb',
@@ -529,15 +519,26 @@ class _GroceryScreenState extends State<GroceryScreen> {
       'Jun',
       'Jul',
       'Aug',
-      'Sept',
+      'Sep',
       'Oct',
       'Nov',
       'Dec',
     ];
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final end = DateTime.now().add(const Duration(days: 6));
-    final dateLabel =
-        'Today to ${days[end.weekday - 1]}, ${months[end.month - 1]} ${end.day}';
+    return '${days[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}';
+  }
+
+  Widget _buildDateHeader() {
+    final first = _firstDay;
+    final last = _lastDay;
+    final dateLabel = first == null || last == null
+        ? ''
+        : first == last
+        ? _formatDay(first)
+        : '${_formatDay(first)} - ${_formatDay(last)}';
+
+    final total = _items.length;
+    final progress = total == 0 ? 0.0 : _boughtCount / total;
 
     return Container(
       margin: const EdgeInsets.only(top: 10),
@@ -546,42 +547,221 @@ class _GroceryScreenState extends State<GroceryScreen> {
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                dateLabel,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: darkBlue,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dateLabel,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: darkBlue,
+                    ),
+                  ),
+                  Text(
+                    "$_mealCount meals, $_dayCount planned ${_dayCount == 1 ? 'day' : 'days'}",
+                    style: const TextStyle(color: textSecondary, fontSize: 13),
+                  ),
+                ],
               ),
-              Text(
-                "$_mealCount meals across $_dayCount planned days",
-                style: const TextStyle(color: textSecondary, fontSize: 13),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: brandGreen,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  "$total Items",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
               ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
               color: brandGreen,
-              borderRadius: BorderRadius.circular(10),
+              backgroundColor: const Color(0xFFE2E8F0),
             ),
-            child: Text(
-              "${_items.length} Items",
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "$_boughtCount of $total bought",
+            style: const TextStyle(
+              color: textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // One meal's items: still to buy first, bought ones folded underneath.
+  Widget _buildMealSection(String meal, List<GroceryItem> items) {
+    final toBuy = items.where((i) => !i.isBought).toList();
+    final bought = items.where((i) => i.isBought).toList();
+    final expanded = _showBought.contains(meal);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 30, bottom: 12, left: 4),
+          child: Row(
+            children: [
+              Text(
+                meal.toUpperCase(),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: textSecondary,
+                  fontSize: 12,
+                  letterSpacing: 2.0,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                "${bought.length}/${items.length}",
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...toBuy.map(_buildGroceryTile),
+        if (bought.isNotEmpty)
+          InkWell(
+            onTap: () => setState(() {
+              if (expanded) {
+                _showBought.remove(meal);
+              } else {
+                _showBought.add(meal);
+              }
+            }),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: brandGreen,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Bought (${bought.length})",
+                    style: const TextStyle(
+                      color: brandGreen,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (expanded) ...bought.map(_buildGroceryTile),
+      ],
+    );
+  }
+
+  // Mark-all button while shopping, or a done card once everything is bought.
+  Widget _buildFooter() {
+    final left = _items.length - _boughtCount;
+
+    if (left == 0) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: brandGreen.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: brandGreen.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: brandGreen, size: 36),
+            const SizedBox(height: 8),
+            const Text(
+              "Shopping done",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: darkBlue,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "New items appear here when you plan more days.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _isUpdatingAll ? null : () => _setAll(false),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text("Start over"),
+              style: TextButton.styleFrom(foregroundColor: brandGreen),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: ElevatedButton(
+        onPressed: _isUpdatingAll ? null : () => _setAll(true),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: darkBlue,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: _isUpdatingAll
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.white,
+                ),
+              )
+            : Text(
+                "Mark all as bought ($left left)",
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
       ),
     );
   }
@@ -675,111 +855,6 @@ class _GroceryScreenState extends State<GroceryScreen> {
       default:
         return Icons.shopping_bag_outlined;
     }
-  }
-
-  Widget _buildCompleteButton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: SizedBox(
-        width: double.infinity,
-        height: 60,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor:
-                darkBlue, // Changed to Dark Blue for "Executive" feel
-            foregroundColor: Colors.white,
-            elevation: 8,
-            shadowColor: darkBlue.withValues(alpha: 0.4),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
-          ),
-          onPressed: _finishShopping,
-          child: const Text(
-            "Finish Shopping",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showSuccessModal() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        child: Padding(
-          padding: const EdgeInsets.all(30),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                height: 80,
-                width: 80,
-                decoration: BoxDecoration(
-                  color: brandGreen.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: brandGreen,
-                  size: 45,
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                "All Set!",
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 22,
-                  color: darkBlue,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                "Your pantry is restocked and you're ready for your healthy meal plan.",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: textSecondary,
-                  fontSize: 14,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: brandGreen,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    widget.onBackToHome();
-                  },
-                  child: const Text(
-                    "Back to Dashboard",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 
