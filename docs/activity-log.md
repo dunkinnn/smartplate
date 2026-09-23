@@ -116,3 +116,17 @@
 - Calendar shows "Today" as the label and a dot per day: outlined for a draft plan, filled for a confirmed plan, with a legend.
 - `track.dart`: calendar uses the same "Today" label; its today dot is removed.
 - Not committed.
+
+## 2026-09-23 - Generate for today only
+
+- Edge Function: `plan_date` must equal today in Manila, otherwise 400 "You can only generate a meal plan for today."
+- `meal_plan.dart`: calendar shows the past 6 days and today; Generate, Regenerate and Use this plan appear only on today. Past days show their plan read-only.
+- `track.dart`: calendar shows the past 6 days and today.
+- `grocery.dart`: list is built from today's plan only.
+- Not committed.
+
+## 2026-09-23 - Calendar starts at signup
+
+- New `services/calendar_days.dart`: `visibleDays()` returns up to the past 6 days and today, never before the account's creation date.
+- `meal_plan.dart`, `track.dart`: calendars use it; fewer than 7 days are left-aligned with spacing. A new user sees only Today.
+- Not committed.

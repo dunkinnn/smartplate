@@ -76,7 +76,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
       '${d.month.toString().padLeft(2, '0')}-'
       '${d.day.toString().padLeft(2, '0')}';
 
-  // Builds one shopping list from the plans for today and the next six days.
+  // Builds the shopping list from today's plan.
   Future<void> _loadList() async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
@@ -106,7 +106,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
           .select('id, plan_date')
           .eq('user_id', user.id)
           .gte('plan_date', _dateKey(today))
-          .lte('plan_date', _dateKey(today.add(const Duration(days: 6))))
+          .lte('plan_date', _dateKey(today))
           .timeout(const Duration(seconds: 10));
 
       final planIds = [for (final p in plans) p['id'] as String];
@@ -394,7 +394,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
           const Expanded(
             child: HeaderTitle(
               title: "Grocery",
-              subtitle: "For your next 7 days of meals",
+              subtitle: "For today's meal plan",
             ),
           ),
           IconButton(
@@ -493,7 +493,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                "Plan meals for today or the coming days and their ingredients will appear here.",
+                "Generate today's meal plan and its ingredients will appear here.",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,

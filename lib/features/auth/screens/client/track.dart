@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/calendar_days.dart';
 import 'package:smart_plate/features/auth/models/food_entry.dart';
 import 'package:smart_plate/features/auth/services/meal_log_service.dart';
 import 'package:smart_plate/features/auth/screens/client/log_meal.dart';
@@ -282,22 +283,24 @@ class _TrackScreenState extends State<TrackScreen> {
     );
   }
 
-  // Three days back, today, and three days ahead.
+  // The past six days and today.
   Widget _buildHorizontalCalendar() {
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final today = DateTime.now();
-    final days = List.generate(
-      7,
-      (i) => DateTime(today.year, today.month, today.day - 3 + i),
-    );
+    final days = visibleDays();
 
+    // A full week spreads out; fewer days since signup sit to the left.
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: days.length == 7
+          ? MainAxisAlignment.spaceBetween
+          : MainAxisAlignment.start,
       children: days.map((date) {
         final isSelected = _dateKey(date) == _dateKey(selectedDate);
         final isToday = _dateKey(date) == _dateKey(today);
 
-        return GestureDetector(
+        return Padding(
+          padding: EdgeInsets.only(right: days.length == 7 ? 0 : 12),
+          child: GestureDetector(
           onTap: () {
             setState(() => selectedDate = date);
             _loadDay();
@@ -346,6 +349,7 @@ class _TrackScreenState extends State<TrackScreen> {
               ),
             ],
           ),
+        ),
         );
       }).toList(),
     );

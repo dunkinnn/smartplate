@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/calendar_days.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
@@ -71,8 +72,8 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           .from('meal_plans')
           .select('plan_date, saved_at')
           .eq('user_id', user.id)
-          .gte('plan_date', _dateKey(today))
-          .lte('plan_date', _dateKey(today.add(const Duration(days: 6))));
+          .gte('plan_date', _dateKey(today.subtract(const Duration(days: 6))))
+          .lte('plan_date', _dateKey(today));
 
       final goals = await supabase
           .from('user_profiles')
@@ -249,7 +250,13 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                           (type) => _buildMealCard(type, itemsByMeal[type]!),
                         ),
                     const SizedBox(height: 10),
-                    _buildPlanActions(),
+                    if (_isToday)
+                      _buildPlanActions()
+                    else
+                      const Text(
+                        "Past plan, view only.",
+                        style: TextStyle(fontSize: 12, color: textSecondary),
+                      ),
                   ],
 
                   const SizedBox(height: 40),
@@ -271,7 +278,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           const Expanded(
             child: HeaderTitle(
               title: "Meal Plan",
-              subtitle: "Plan today and the week ahead",
+              subtitle: "Your AI meal plan for today",
             ),
           ),
           IconButton(
@@ -296,22 +303,24 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     );
   }
 
-  // Today and the next six days.
+  // The past six days and today; only today can be generated.
   Widget _buildHorizontalCalendar() {
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final today = DateTime.now();
-    final days = List.generate(
-      7,
-      (i) => DateTime(today.year, today.month, today.day + i),
-    );
+    final days = visibleDays();
 
+    // A full week spreads out; fewer days since signup sit to the left.
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: days.length == 7
+          ? MainAxisAlignment.spaceBetween
+          : MainAxisAlignment.start,
       children: days.map((date) {
         final isSelected = _dateKey(date) == _dateKey(selectedDate);
         final isToday = _dateKey(date) == _dateKey(today);
 
-        return GestureDetector(
+        return Padding(
+          padding: EdgeInsets.only(right: days.length == 7 ? 0 : 12),
+          child: GestureDetector(
           onTap: () {
             setState(() => selectedDate = date);
             _loadPlan();
@@ -377,6 +386,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
               ),
             ],
           ),
+        ),
         );
       }).toList(),
     );
@@ -439,8 +449,8 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         const SizedBox(height: 30),
         const Icon(Icons.restaurant_menu_rounded, size: 48, color: borderColor),
         const SizedBox(height: 16),
-        const Text(
-          "No plan for this day",
+        Text(
+          _isToday ? "No plan for today yet" : "No plan was made for this day",
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w900,
@@ -448,8 +458,10 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
-          "Generate one from your goals, diet and allergies.",
+        Text(
+          _isToday
+              ? "Generate one from your goals, diet and allergies."
+              : "Meal plans can only be generated for the current day.",
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 13,
@@ -457,41 +469,43 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
             fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          height: 55,
-          child: ElevatedButton.icon(
-            onPressed: isGenerating ? null : _generatePlan,
-            icon: isGenerating
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.5,
-                    ),
-                  )
-                : const Icon(Icons.auto_awesome_rounded, size: 20),
-            label: Text(
-              isGenerating ? "Generating..." : "Generate Meal Plan",
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 15,
+        if (_isToday) ...[
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 55,
+            child: ElevatedButton.icon(
+              onPressed: isGenerating ? null : _generatePlan,
+              icon: isGenerating
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : const Icon(Icons.auto_awesome_rounded, size: 20),
+              label: Text(
+                isGenerating ? "Generating..." : "Generate Meal Plan",
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 15,
+                ),
               ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: brandGreen,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: brandGreen.withValues(alpha: 0.5),
-              disabledForegroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: brandGreen,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: brandGreen.withValues(alpha: 0.5),
+                disabledForegroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -526,9 +540,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              _isToday
-                  ? "Mark meals as eaten in Track."
-                  : "Mark these meals as eaten in Track on that day.",
+              "Mark meals as eaten in Track.",
               style: const TextStyle(color: textSecondary, fontSize: 12),
             ),
           ],

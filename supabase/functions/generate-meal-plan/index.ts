@@ -274,10 +274,9 @@ Deno.serve(async (req) => {
     planDate = manilaDay;
   }
 
-  // Only today and the next six days can be planned, matching the app calendar.
-  const dayOffset = (Date.parse(planDate) - Date.parse(manilaDay)) / 86400000;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(planDate) || !(dayOffset >= 0 && dayOffset <= 6)) {
-    return json({ error: 'You can plan today and the next 6 days only.' }, 400);
+  // Plans can only be generated for today, matching the app.
+  if (planDate !== manilaDay) {
+    return json({ error: 'You can only generate a meal plan for today.' }, 400);
   }
 
   const { data: profile, error: profileError } = await supabase
