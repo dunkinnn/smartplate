@@ -103,3 +103,16 @@
 
 - `track.dart`: today's hand-logged foods have a delete icon; a confirm dialog removes the `food_logs` row (uses the delete policy from `food-logs-delete-policy.sql`). Planned meals are undone by tapping them instead.
 - Not committed.
+
+## 2026-09-23 - Remove eaten circle from Meal Plan
+
+- `meal_plan.dart`: eaten circles removed; Meal Plan only plans and confirms. Banner says to mark meals as eaten in Track. Track is now the single place to record eating; Home shows read-only planned/eaten labels.
+- Not committed.
+
+## 2026-09-23 - Meal Plan details, macros, week status
+
+- `meal_plan.dart`: tapping a dish opens a bottom sheet with ingredients, kcal and macros, and an allergy-checked note.
+- Summary adds a card with "Fits your X kcal goal" and protein, carbs, fat bars against profile goals.
+- Calendar shows "Today" as the label and a dot per day: outlined for a draft plan, filled for a confirmed plan, with a legend.
+- `track.dart`: calendar uses the same "Today" label; its today dot is removed.
+- Not committed.

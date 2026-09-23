@@ -305,7 +305,7 @@ class _TrackScreenState extends State<TrackScreen> {
           child: Column(
             children: [
               Text(
-                dayNames[date.weekday - 1],
+                isToday ? 'Today' : dayNames[date.weekday - 1],
                 style: TextStyle(
                   color: isSelected ? darkBlue : textSecondary,
                   fontSize: 12,
@@ -342,16 +342,6 @@ class _TrackScreenState extends State<TrackScreen> {
                     color: isSelected ? Colors.white : textMain,
                     fontWeight: FontWeight.w700,
                   ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              // Dot marks today so the calendar reads the same on every screen.
-              Container(
-                width: 5,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: isToday ? brandGreen : Colors.transparent,
-                  shape: BoxShape.circle,
                 ),
               ),
             ],

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:smart_plate/features/auth/models/food_entry.dart';
-import 'package:smart_plate/features/auth/services/meal_log_service.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
@@ -34,11 +32,13 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
   bool isSaved = false;
   bool isSaving = false;
 
-  // Meals of the selected day already marked as eaten; shared with Home and Track.
-  Set<String> eatenMeals = {};
-  String? _togglingMeal;
-
   bool get _isToday => _dateKey(selectedDate) == _dateKey(DateTime.now());
+
+  // Goals the plan is measured against, from user_profiles.
+  Map<String, dynamic> _goals = {};
+
+  // Plan status per date in the calendar: 'planned' or 'confirmed'.
+  Map<String, String> _weekStatus = {};
 
   // Inline message instead of a snackbar.
   String? _message;
@@ -66,6 +66,34 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     setState(() => isLoading = true);
 
     try {
+      final today = DateTime.now();
+      final week = await supabase
+          .from('meal_plans')
+          .select('plan_date, saved_at')
+          .eq('user_id', user.id)
+          .gte('plan_date', _dateKey(today))
+          .lte('plan_date', _dateKey(today.add(const Duration(days: 6))));
+
+      final goals = await supabase
+          .from('user_profiles')
+          .select(
+            'calorie_target, protein_goal_g, carbs_goal_g, fat_goal_g, allergen',
+          )
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (mounted) {
+        setState(() {
+          _goals = goals ?? {};
+          _weekStatus = {
+            for (final r in week)
+              r['plan_date'] as String: r['saved_at'] != null
+                  ? 'confirmed'
+                  : 'planned',
+          };
+        });
+      }
+
       final plan = await supabase
           .from('meal_plans')
           .select('id, total_kcal, saved_at')
@@ -97,18 +125,10 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         grouped.putIfAbsent(meal, () => []).add(map);
       }
 
-      final eaten = await supabase
-          .from('food_logs')
-          .select('meal_type')
-          .eq('user_id', user.id)
-          .eq('logged_date', _dateKey(selectedDate))
-          .eq('source', 'plan');
-
       if (!mounted) return;
       setState(() {
         itemsByMeal = grouped;
         isSaved = plan['saved_at'] != null;
-        eatenMeals = {for (final r in eaten) r['meal_type'] as String};
         totalKcal = (plan['total_kcal'] as num?)?.round() ?? 0;
         isLoading = false;
       });
@@ -158,40 +178,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     if (mounted) setState(() => isGenerating = false);
   }
 
-  // Marks a meal of today's confirmed plan as eaten, or undoes it.
-  Future<void> _toggleEaten(String mealType) async {
-    if (_togglingMeal != null) return;
-    final wasEaten = eatenMeals.contains(mealType);
-    setState(() => _togglingMeal = mealType);
-
-    try {
-      await MealLogService.setPlannedMealEaten(
-        date: selectedDate,
-        mealType: mealType,
-        dishes: [
-          for (final item in itemsByMeal[mealType] ?? const [])
-            FoodEntry.fromPlanItem(item),
-        ],
-        eaten: !wasEaten,
-      );
-      if (mounted) {
-        setState(() {
-          if (wasEaten) {
-            eatenMeals.remove(mealType);
-          } else {
-            eatenMeals.add(mealType);
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('Failed to update eaten meal: $e');
-      if (mounted) setState(() => _message = 'Could not update this meal.');
-    }
-
-    if (mounted) setState(() => _togglingMeal = null);
-  }
-
-  // Confirms the plan for the day, which unlocks marking its meals as eaten.
+  // Confirms the plan for the day; eating is recorded in Track.
   Future<void> _usePlan() async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
@@ -241,6 +228,8 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                 children: [
                   SizedBox(height: GlassHeader.insetFor(context) + 10),
                   _buildHorizontalCalendar(),
+                  const SizedBox(height: 12),
+                  _buildCalendarLegend(),
                   _buildMessageBanner(),
                   const SizedBox(height: 30),
 
@@ -330,7 +319,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           child: Column(
             children: [
               Text(
-                dayNames[date.weekday - 1],
+                isToday ? 'Today' : dayNames[date.weekday - 1],
                 style: TextStyle(
                   color: isSelected ? darkBlue : textSecondary,
                   fontSize: 12,
@@ -370,13 +359,20 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                 ),
               ),
               const SizedBox(height: 6),
-              // Dot marks today so the calendar reads the same on every screen.
+              // Green dot for a confirmed plan, outlined dot for a draft plan.
               Container(
-                width: 5,
-                height: 5,
+                width: 6,
+                height: 6,
                 decoration: BoxDecoration(
-                  color: isToday ? brandGreen : Colors.transparent,
+                  color: _weekStatus[_dateKey(date)] == 'confirmed'
+                      ? brandGreen
+                      : Colors.transparent,
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _weekStatus.containsKey(_dateKey(date))
+                        ? brandGreen
+                        : Colors.transparent,
+                  ),
                 ),
               ),
             ],
@@ -531,8 +527,8 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
             const SizedBox(height: 4),
             Text(
               _isToday
-                  ? "Tap the circle on a meal once you have eaten it."
-                  : "You can mark these meals as eaten on that day.",
+                  ? "Mark meals as eaten in Track."
+                  : "Mark these meals as eaten in Track on that day.",
               style: const TextStyle(color: textSecondary, fontSize: 12),
             ),
           ],
@@ -668,7 +664,305 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 20),
+        _buildMacroCard(),
       ],
+    );
+  }
+
+  double _sumOf(String key) => itemsByMeal.values
+      .expand((l) => l)
+      .fold(0.0, (s, i) => s + ((i[key] as num?)?.toDouble() ?? 0));
+
+  // Planned calories and macros against the user's goals.
+  Widget _buildMacroCard() {
+    final target = (_goals['calorie_target'] as num?)?.round();
+    final fitsGoal =
+        target != null && (totalKcal - target).abs() <= target * 0.1;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (target != null)
+            Row(
+              children: [
+                Icon(
+                  fitsGoal
+                      ? Icons.check_circle_rounded
+                      : Icons.info_outline_rounded,
+                  color: fitsGoal ? brandGreen : textSecondary,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    fitsGoal
+                        ? "Fits your ${_formatNumber(target)} kcal daily goal"
+                        : "Your daily goal is ${_formatNumber(target)} kcal",
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: fitsGoal ? brandGreen : textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          const SizedBox(height: 14),
+          _buildMacroRow(
+            "Protein",
+            _sumOf('protein_g'),
+            _goals['protein_goal_g'],
+            brandGreen,
+          ),
+          _buildMacroRow(
+            "Carbs",
+            _sumOf('carbs_g'),
+            _goals['carbs_goal_g'],
+            darkBlue,
+          ),
+          _buildMacroRow(
+            "Fat",
+            _sumOf('fat_g'),
+            _goals['fat_goal_g'],
+            const Color(0xFFFB4B93),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacroRow(String label, double value, Object? goal, Color color) {
+    final goalValue = (goal as num?)?.toDouble();
+    final progress = goalValue != null && goalValue > 0
+        ? (value / goalValue).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: textMain,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                goalValue != null
+                    ? "${value.round()} / ${goalValue.round()} g"
+                    : "${value.round()} g",
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+              color: color,
+              backgroundColor: const Color(0xFFE2E8F0),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarLegend() {
+    Widget dot(bool filled) => Container(
+      width: 6,
+      height: 6,
+      decoration: BoxDecoration(
+        color: filled ? brandGreen : Colors.transparent,
+        shape: BoxShape.circle,
+        border: Border.all(color: brandGreen),
+      ),
+    );
+    const style = TextStyle(fontSize: 11, color: textSecondary);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        dot(false),
+        const SizedBox(width: 6),
+        const Text("Planned", style: style),
+        const SizedBox(width: 16),
+        dot(true),
+        const SizedBox(width: 6),
+        const Text("Confirmed", style: style),
+      ],
+    );
+  }
+
+  // Ingredients, macros and allergy note for one dish.
+  void _showDishDetails(String mealType, Map<String, dynamic> item) {
+    final ingredients = (item['ingredients'] as List?) ?? const [];
+    final allergen = (_goals['allergen'] as String? ?? '').trim();
+    final hasAllergen = allergen.isNotEmpty && allergen.toLowerCase() != 'none';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        builder: (context, controller) => ListView(
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: borderColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              mealType.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: textSecondary,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              item['name'] as String? ?? '',
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: darkBlue,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _buildNutrientTile("kcal", item['kcal']),
+                _buildNutrientTile("Protein", item['protein_g'], unit: 'g'),
+                _buildNutrientTile("Carbs", item['carbs_g'], unit: 'g'),
+                _buildNutrientTile("Fat", item['fat_g'], unit: 'g'),
+              ],
+            ),
+            if (hasAllergen) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: brandGreen.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.verified_user_rounded,
+                      color: brandGreen,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Checked against your allergies: $allergen",
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: brandGreen,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            const Text(
+              "INGREDIENTS",
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: textSecondary,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final raw in ingredients)
+              if (raw is Map)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          raw['name'] as String? ?? '',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: textMain,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        raw['quantity'] as String? ?? '',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNutrientTile(String label, Object? value, {String unit = ''}) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            "${(value as num?)?.round() ?? 0}$unit",
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: darkBlue,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, color: textSecondary),
+          ),
+        ],
+      ),
     );
   }
 
@@ -705,33 +999,6 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildEatenButton(String mealType) {
-    final eaten = eatenMeals.contains(mealType);
-    final busy = _togglingMeal == mealType;
-
-    return IconButton(
-      tooltip: eaten ? 'Mark as not eaten' : 'Ate this',
-      visualDensity: VisualDensity.compact,
-      onPressed: busy ? null : () => _toggleEaten(mealType),
-      icon: busy
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: brandGreen,
-              ),
-            )
-          : Icon(
-              eaten
-                  ? Icons.check_circle_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              color: eaten ? brandGreen : textSecondary,
-              size: 24,
-            ),
     );
   }
 
@@ -801,58 +1068,65 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                             color: darkBlue,
                           ),
                         ),
-                        Row(
-                          children: [
-                            Text(
-                              "$mealKcal kcal",
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: textSecondary,
-                              ),
-                            ),
-                            // Eaten check only on today's confirmed plan.
-                            if (isSaved && _isToday) _buildEatenButton(title),
-                          ],
+                        Text(
+                          "$mealKcal kcal",
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: textSecondary,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
                     ...items.map(
-                      (item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 5,
-                              height: 5,
-                              decoration: BoxDecoration(
-                                color: iconColor.withValues(alpha: 0.5),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                item['name'] as String? ?? '',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: textMain,
-                                  fontWeight: FontWeight.w600,
+                      (item) => InkWell(
+                        onTap: () => _showDishDetails(title, item),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: iconColor.withValues(alpha: 0.5),
+                                  shape: BoxShape.circle,
                                 ),
                               ),
-                            ),
-                            Text(
-                              "${(item['kcal'] as num?)?.round() ?? 0} kcal",
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: darkBlue,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  item['name'] as String? ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: textMain,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
+                              Text(
+                                "${(item['kcal'] as num?)?.round() ?? 0} kcal",
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: darkBlue,
+                                ),
+                              ),
+                              const Icon(
+                                Icons.chevron_right_rounded,
+                                color: textSecondary,
+                                size: 20,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
+                    ),
+                    const Text(
+                      "Tap a dish for ingredients and nutrition",
+                      style: TextStyle(fontSize: 11, color: textSecondary),
                     ),
                   ],
                 ),
