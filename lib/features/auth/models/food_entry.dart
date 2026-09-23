@@ -31,6 +31,17 @@ class FoodEntry {
     source: row['source'] as String? ?? 'custom',
   );
 
+  // A dish from meal_plan_items, logged as one serving from the plan.
+  factory FoodEntry.fromPlanItem(Map<String, dynamic> item) => FoodEntry(
+    name: item['name'] as String? ?? '',
+    quantity: '1 serving',
+    kcal: (item['kcal'] as num?)?.round() ?? 0,
+    proteinG: (item['protein_g'] as num?)?.toDouble() ?? 0,
+    carbsG: (item['carbs_g'] as num?)?.toDouble() ?? 0,
+    fatG: (item['fat_g'] as num?)?.toDouble() ?? 0,
+    source: 'plan',
+  );
+
   // Row shape for inserting into food_logs.
   Map<String, dynamic> toRow({
     required String userId,

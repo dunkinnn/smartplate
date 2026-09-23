@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/models/food_entry.dart';
+import 'package:smart_plate/features/auth/services/meal_log_service.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
@@ -27,6 +29,16 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
   int totalKcal = 0;
   bool isLoading = true;
   bool isGenerating = false;
+
+  // A confirmed plan is final for the day and hides Regenerate.
+  bool isSaved = false;
+  bool isSaving = false;
+
+  // Meals of the selected day already marked as eaten; shared with Home and Track.
+  Set<String> eatenMeals = {};
+  String? _togglingMeal;
+
+  bool get _isToday => _dateKey(selectedDate) == _dateKey(DateTime.now());
 
   // Inline message instead of a snackbar.
   String? _message;
@@ -56,7 +68,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     try {
       final plan = await supabase
           .from('meal_plans')
-          .select('id, total_kcal')
+          .select('id, total_kcal, saved_at')
           .eq('user_id', user.id)
           .eq('plan_date', _dateKey(selectedDate))
           .maybeSingle();
@@ -65,6 +77,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         if (!mounted) return;
         setState(() {
           itemsByMeal = {};
+          isSaved = false;
           totalKcal = 0;
           isLoading = false;
         });
@@ -84,9 +97,18 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         grouped.putIfAbsent(meal, () => []).add(map);
       }
 
+      final eaten = await supabase
+          .from('food_logs')
+          .select('meal_type')
+          .eq('user_id', user.id)
+          .eq('logged_date', _dateKey(selectedDate))
+          .eq('source', 'plan');
+
       if (!mounted) return;
       setState(() {
         itemsByMeal = grouped;
+        isSaved = plan['saved_at'] != null;
+        eatenMeals = {for (final r in eaten) r['meal_type'] as String};
         totalKcal = (plan['total_kcal'] as num?)?.round() ?? 0;
         isLoading = false;
       });
@@ -116,6 +138,15 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
       }
 
       await _loadPlan();
+    } on FunctionException catch (e) {
+      // Non-2xx responses carry the function's error message in details.
+      final details = e.details;
+      final error = details is Map ? details['error'] : null;
+      if (mounted) {
+        setState(
+          () => _message = error?.toString() ?? 'Could not generate a plan.',
+        );
+      }
     } catch (e) {
       if (mounted) {
         setState(
@@ -125,6 +156,68 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     }
 
     if (mounted) setState(() => isGenerating = false);
+  }
+
+  // Marks a meal of today's confirmed plan as eaten, or undoes it.
+  Future<void> _toggleEaten(String mealType) async {
+    if (_togglingMeal != null) return;
+    final wasEaten = eatenMeals.contains(mealType);
+    setState(() => _togglingMeal = mealType);
+
+    try {
+      await MealLogService.setPlannedMealEaten(
+        date: selectedDate,
+        mealType: mealType,
+        dishes: [
+          for (final item in itemsByMeal[mealType] ?? const [])
+            FoodEntry.fromPlanItem(item),
+        ],
+        eaten: !wasEaten,
+      );
+      if (mounted) {
+        setState(() {
+          if (wasEaten) {
+            eatenMeals.remove(mealType);
+          } else {
+            eatenMeals.add(mealType);
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to update eaten meal: $e');
+      if (mounted) setState(() => _message = 'Could not update this meal.');
+    }
+
+    if (mounted) setState(() => _togglingMeal = null);
+  }
+
+  // Confirms the plan for the day, which unlocks marking its meals as eaten.
+  Future<void> _usePlan() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null || isSaving) return;
+
+    setState(() {
+      isSaving = true;
+      _message = null;
+    });
+
+    try {
+      final updated = await supabase
+          .from('meal_plans')
+          .update({'saved_at': DateTime.now().toUtc().toIso8601String()})
+          .eq('user_id', user.id)
+          .eq('plan_date', _dateKey(selectedDate))
+          .select('id');
+      if ((updated as List).isEmpty) throw Exception('Plan not updated');
+
+      if (mounted) setState(() => isSaved = true);
+    } catch (e) {
+      debugPrint('Failed to confirm meal plan: $e');
+      if (mounted) setState(() => _message = 'Could not confirm your plan.');
+    }
+
+    if (mounted) setState(() => isSaving = false);
   }
 
   @override
@@ -167,7 +260,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                           (type) => _buildMealCard(type, itemsByMeal[type]!),
                         ),
                     const SizedBox(height: 10),
-                    _buildRegenerateButton(),
+                    _buildPlanActions(),
                   ],
 
                   const SizedBox(height: 40),
@@ -188,8 +281,8 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           const SizedBox(width: 56), // Matches trailing icon plus padding
           const Expanded(
             child: HeaderTitle(
-              title: "Meal",
-              subtitle: "AI-generated meal plan",
+              title: "Meal Plan",
+              subtitle: "Plan today and the week ahead",
             ),
           ),
           IconButton(
@@ -214,19 +307,20 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     );
   }
 
-  // Rolling week ending today.
+  // Today and the next six days.
   Widget _buildHorizontalCalendar() {
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final today = DateTime.now();
     final days = List.generate(
       7,
-      (i) => DateTime(today.year, today.month, today.day - (6 - i)),
+      (i) => DateTime(today.year, today.month, today.day + i),
     );
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: days.map((date) {
         final isSelected = _dateKey(date) == _dateKey(selectedDate);
+        final isToday = _dateKey(date) == _dateKey(today);
 
         return GestureDetector(
           onTap: () {
@@ -273,6 +367,16 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                     color: isSelected ? Colors.white : textMain,
                     fontWeight: FontWeight.w700,
                   ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              // Dot marks today so the calendar reads the same on every screen.
+              Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: isToday ? brandGreen : Colors.transparent,
+                  shape: BoxShape.circle,
                 ),
               ),
             ],
@@ -396,12 +500,94 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     );
   }
 
+  // Regenerate and Use this plan side by side, or a confirmed banner.
+  Widget _buildPlanActions() {
+    if (isSaved) {
+
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: brandGreen.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: brandGreen.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          children: [
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle_rounded, color: brandGreen, size: 18),
+                SizedBox(width: 8),
+                Text(
+                  "Plan confirmed",
+                  style: TextStyle(
+                    color: brandGreen,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _isToday
+                  ? "Tap the circle on a meal once you have eaten it."
+                  : "You can mark these meals as eaten on that day.",
+              style: const TextStyle(color: textSecondary, fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: _buildRegenerateButton()),
+        const SizedBox(width: 12),
+        Expanded(child: _buildSaveButton()),
+      ],
+    );
+  }
+
+  Widget _buildSaveButton() {
+    final busy = isSaving || isGenerating;
+
+    return SizedBox(
+      height: 50,
+      child: ElevatedButton.icon(
+        onPressed: busy ? null : _usePlan,
+        icon: isSaving
+            ? const SizedBox(
+                height: 16,
+                width: 16,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
+            : const Icon(Icons.check_rounded, size: 18),
+        label: Text(
+          isSaving ? "Saving..." : "Use this plan",
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: brandGreen,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildRegenerateButton() {
     return SizedBox(
       width: double.infinity,
       height: 50,
       child: OutlinedButton.icon(
-        onPressed: isGenerating ? null : _generatePlan,
+        onPressed: isGenerating || isSaving ? null : _generatePlan,
         icon: isGenerating
             ? const SizedBox(
                 height: 16,
@@ -522,7 +708,38 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     );
   }
 
+  Widget _buildEatenButton(String mealType) {
+    final eaten = eatenMeals.contains(mealType);
+    final busy = _togglingMeal == mealType;
+
+    return IconButton(
+      tooltip: eaten ? 'Mark as not eaten' : 'Ate this',
+      visualDensity: VisualDensity.compact,
+      onPressed: busy ? null : () => _toggleEaten(mealType),
+      icon: busy
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: brandGreen,
+              ),
+            )
+          : Icon(
+              eaten
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              color: eaten ? brandGreen : textSecondary,
+              size: 24,
+            ),
+    );
+  }
+
   Widget _buildMealCard(String title, List<Map<String, dynamic>> items) {
+    final mealKcal = items.fold(
+      0,
+      (sum, i) => sum + ((i['kcal'] as num?)?.round() ?? 0),
+    );
     IconData mealIcon;
     Color iconColor;
 
@@ -584,10 +801,19 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                             color: darkBlue,
                           ),
                         ),
-                        const Icon(
-                          Icons.more_horiz_rounded,
-                          color: borderColor,
-                          size: 20,
+                        Row(
+                          children: [
+                            Text(
+                              "$mealKcal kcal",
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: textSecondary,
+                              ),
+                            ),
+                            // Eaten check only on today's confirmed plan.
+                            if (isSaved && _isToday) _buildEatenButton(title),
+                          ],
                         ),
                       ],
                     ),

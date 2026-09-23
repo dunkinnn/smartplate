@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/models/food_entry.dart';
+import 'package:smart_plate/features/auth/services/meal_log_service.dart';
 import 'package:smart_plate/features/auth/screens/client/grocery.dart';
 import 'package:smart_plate/features/auth/screens/client/insight.dart';
 import 'package:smart_plate/features/auth/screens/client/meal_plan.dart';
@@ -18,6 +20,9 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
+
+  // Bumped on each tab switch so the other tabs reload fresh data.
+  int _refreshTick = 0;
   static const Color brandGreen = Color(0xFF67A75F);
   static const Color darkBlue = Color(0xFF1E293B); // Refined dark blue
   static const Color textSecondary = Color(0xFF64748B);
@@ -35,6 +40,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Today's generated meal plan, empty until one has been generated.
   List<Map<String, dynamic>> _todayPlan = [];
+
+  // Planned meal types already marked as eaten today.
+  Set<String> _eatenPlanMeals = {};
+  String? _togglingMeal;
 
   @override
   void initState() {
@@ -72,7 +81,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       final items = await supabase
           .from('meal_plan_items')
-          .select('meal_type, name, kcal')
+          .select('meal_type, name, kcal, protein_g, carbs_g, fat_g')
           .eq('plan_id', plan['id'])
           .order('sort_order');
 
@@ -94,25 +103,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final rows = await supabase
           .from('food_logs')
-          .select('meal_type, kcal')
+          .select('meal_type, kcal, source')
           .eq('user_id', user.id)
           .eq('logged_date', _todayKey);
 
       var kcal = 0;
       final meals = <String>{};
+      final eatenPlan = <String>{};
       for (final row in rows as List) {
         kcal += ((row as Map)['kcal'] as num?)?.round() ?? 0;
-        meals.add(row['meal_type'] as String? ?? '');
+        final meal = row['meal_type'] as String? ?? '';
+        meals.add(meal);
+        if (row['source'] == 'plan') eatenPlan.add(meal);
       }
 
       if (!mounted) return;
       setState(() {
         _consumedKcal = kcal;
         _mealsLogged = meals.length;
+        _eatenPlanMeals = eatenPlan;
       });
     } catch (e) {
       debugPrint('Failed to load today\'s logs: $e');
     }
+  }
+
+  // One-tap "Ate this" for a planned meal; Track shows the same state.
+  Future<void> _toggleEaten(String mealType) async {
+    if (_togglingMeal != null) return;
+    setState(() => _togglingMeal = mealType);
+
+    try {
+      await MealLogService.setPlannedMealEaten(
+        date: DateTime.now(),
+        mealType: mealType,
+        dishes: [
+          for (final item in _todayPlan)
+            if (item['meal_type'] == mealType) FoodEntry.fromPlanItem(item),
+        ],
+        eaten: !_eatenPlanMeals.contains(mealType),
+      );
+      await _loadTodayLogs();
+    } catch (e) {
+      debugPrint('Failed to update eaten meal: $e');
+    }
+
+    if (mounted) setState(() => _togglingMeal = null);
   }
 
   // Share of the calorie target consumed today, 0 when no goal is set.
@@ -167,14 +203,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return name.split(' ').first;
   }
 
+  // Logs and plans may have changed while the user was on another tab.
+  void _selectTab(int index) {
+    setState(() {
+      if (index >= 1 && index != _selectedIndex) _refreshTick++;
+      _selectedIndex = index;
+    });
+    if (index == 0) {
+      _loadTodayLogs();
+      _loadTodayPlan();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
       _buildHomeContent(),
-      MealPlanScreen(onBackToHome: () => setState(() => _selectedIndex = 0)),
-      GroceryScreen(onBackToHome: () => setState(() => _selectedIndex = 0)),
-      TrackScreen(onBackToHome: () => setState(() => _selectedIndex = 0)),
-      InsightsScreen(onBackToHome: () => setState(() => _selectedIndex = 0)),
+      MealPlanScreen(
+        key: ValueKey('meal-plan-$_refreshTick'),
+        onBackToHome: () => _selectTab(0),
+      ),
+      GroceryScreen(
+        key: ValueKey('grocery-$_refreshTick'),
+        onBackToHome: () => setState(() => _selectedIndex = 0),
+      ),
+      TrackScreen(
+        key: ValueKey('track-$_refreshTick'),
+        onBackToHome: () => setState(() => _selectedIndex = 0),
+      ),
+      InsightsScreen(
+        key: ValueKey('insights-$_refreshTick'),
+        onBackToHome: () => setState(() => _selectedIndex = 0),
+      ),
     ];
 
     return Scaffold(
@@ -185,14 +245,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: IndexedStack(index: _selectedIndex, children: pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() => _selectedIndex = index);
-          // Logs and plans may have changed while the user was on another tab.
-          if (index == 0) {
-            _loadTodayLogs();
-            _loadTodayPlan();
-          }
-        },
+        onTap: _selectTab,
         type: BottomNavigationBarType.fixed,
         selectedItemColor: brandGreen,
         unselectedItemColor: textSecondary,
@@ -222,7 +275,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 size: 20,
               ),
             ),
-            label: 'Shop',
+            label: 'Grocery',
           ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.edit_note),
@@ -410,7 +463,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               TextButton(
-                onPressed: () => setState(() => _selectedIndex = 1),
+                onPressed: () => _selectTab(1),
                 child: const Text(
                   "View All",
                   style: TextStyle(
@@ -430,6 +483,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 item['meal_type'] as String? ?? 'Meal',
                 item['name'] as String? ?? '',
                 "${(item['kcal'] as num?)?.round() ?? 0} kcal",
+              ),
+            ),
+          if (_todayPlan.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                "Tap the circle when you have eaten a meal.",
+                style: TextStyle(fontSize: 12, color: textSecondary),
               ),
             ),
           const SizedBox(height: 30),
@@ -545,7 +606,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 15),
                 ElevatedButton(
-                  onPressed: () => setState(() => _selectedIndex = 3),
+                  onPressed: () => _selectTab(3),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: brandGreen,
                     foregroundColor: Colors.white,
@@ -665,6 +726,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildMealItem(String title, String dish, String kcal) {
     final (icon, accentColor) = _mealStyle(title);
+    final eaten = _eatenPlanMeals.contains(title);
+    final busy = _togglingMeal == title;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -716,11 +779,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   fontSize: 14,
                 ),
               ),
-              const Text(
-                "per serve",
-                style: TextStyle(fontSize: 10, color: textSecondary),
+              Text(
+                eaten ? "eaten" : "planned",
+                style: TextStyle(
+                  fontSize: 10,
+                  color: eaten ? brandGreen : textSecondary,
+                  fontWeight: eaten ? FontWeight.w800 : FontWeight.normal,
+                ),
               ),
             ],
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            tooltip: eaten ? 'Mark as not eaten' : 'Ate this',
+            onPressed: busy ? null : () => _toggleEaten(title),
+            icon: busy
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: brandGreen,
+                    ),
+                  )
+                : Icon(
+                    eaten
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: eaten ? brandGreen : textSecondary,
+                    size: 26,
+                  ),
           ),
         ],
       ),

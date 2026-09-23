@@ -4,28 +4,23 @@ import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
 // --- MODEL ---
+// One ingredient on the week's list, backed by one grocery_items row per plan.
 class GroceryItem {
-  final String? id;
+  final List<String> ids;
   final String name;
   final String quantity;
   final String category;
+  final String mealType;
   bool isBought;
 
   GroceryItem({
-    this.id,
+    this.ids = const [],
     required this.name,
     required this.quantity,
     required this.category,
+    this.mealType = 'Other',
     this.isBought = false,
   });
-
-  factory GroceryItem.fromRow(Map<String, dynamic> row) => GroceryItem(
-    id: row['id'] as String?,
-    name: row['name'] as String? ?? '',
-    quantity: row['quantity'] as String? ?? '',
-    category: row['category'] as String? ?? 'Pantry',
-    isBought: row['is_checked'] as bool? ?? false,
-  );
 }
 
 class GroceryScreen extends StatefulWidget {
@@ -42,6 +37,8 @@ class _GroceryScreenState extends State<GroceryScreen> {
   static const Color darkBlue = Color(0xFF1E293B);
   static const Color textSecondary = Color(0xFF64748B);
 
+  static const mealOrder = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Other'];
+
   static const categoryOrder = [
     'Protein',
     'Vegetables',
@@ -53,6 +50,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
 
   List<GroceryItem> _items = [];
   int _mealCount = 0;
+  int _dayCount = 0;
   bool _isLoading = true;
   bool _hasPlan = false;
   String? _error;
@@ -63,15 +61,12 @@ class _GroceryScreenState extends State<GroceryScreen> {
     _loadList();
   }
 
-  String get _todayKey {
-    final now = DateTime.now();
-    return '${now.year.toString().padLeft(4, '0')}-'
-        '${now.month.toString().padLeft(2, '0')}-'
-        '${now.day.toString().padLeft(2, '0')}';
-  }
+  String _dateKey(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 
-  // Loads the saved list for today's plan, building it from the plan's
-  // ingredients the first time.
+  // Builds one shopping list from the plans for today and the next six days.
   Future<void> _loadList() async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
@@ -93,56 +88,71 @@ class _GroceryScreenState extends State<GroceryScreen> {
     }
 
     try {
+      final today = DateTime.now();
+
       // Without a timeout a stalled request leaves the spinner up forever.
-      final plan = await supabase
+      final plans = await supabase
           .from('meal_plans')
           .select('id')
           .eq('user_id', user.id)
-          .eq('plan_date', _todayKey)
-          .maybeSingle()
+          .gte('plan_date', _dateKey(today))
+          .lte('plan_date', _dateKey(today.add(const Duration(days: 6))))
           .timeout(const Duration(seconds: 10));
 
-      if (plan == null) {
+      final planIds = [for (final p in plans) p['id'] as String];
+
+      if (planIds.isEmpty) {
         if (!mounted) return;
         setState(() {
           _items = [];
           _mealCount = 0;
+          _dayCount = 0;
           _hasPlan = false;
           _isLoading = false;
         });
         return;
       }
 
-      final planId = plan['id'] as String;
-
       final planItems = await supabase
           .from('meal_plan_items')
-          .select('ingredients')
-          .eq('plan_id', planId);
+          .select('plan_id, meal_type, ingredients')
+          .inFilter('plan_id', planIds);
 
-      var rows = await supabase
-          .from('grocery_items')
-          .select()
-          .eq('user_id', user.id)
-          .eq('plan_id', planId)
-          .order('name');
+      var rows = await _fetchRows(user.id, planIds);
 
-      if ((rows as List).isEmpty) {
-        await _buildListFromPlan(user.id, planId, planItems as List);
-        rows = await supabase
+      // Lists built before meal grouping have no meal; rebuild them by meal.
+      final stale = {
+        for (final r in rows)
+          if (r['meal_type'] == null) r['plan_id'] as String,
+      };
+      if (stale.isNotEmpty) {
+        await supabase
             .from('grocery_items')
-            .select()
+            .delete()
             .eq('user_id', user.id)
-            .eq('plan_id', planId)
-            .order('name');
+            .inFilter('plan_id', stale.toList());
+        rows = rows.where((r) => !stale.contains(r['plan_id'])).toList();
+      }
+
+      final listed = {for (final r in rows) r['plan_id'] as String?};
+
+      // Plans without a list yet (new or regenerated) get one built now.
+      final missing = planIds.where((id) => !listed.contains(id)).toList();
+      if (missing.isNotEmpty) {
+        for (final id in missing) {
+          await _buildListFromPlan(user.id, id, [
+            for (final i in planItems)
+              if (i['plan_id'] == id) i,
+          ]);
+        }
+        rows = await _fetchRows(user.id, planIds);
       }
 
       if (!mounted) return;
       setState(() {
-        _items = (rows as List)
-            .map((r) => GroceryItem.fromRow(r as Map<String, dynamic>))
-            .toList();
-        _mealCount = (planItems as List).length;
+        _items = _merge(rows);
+        _mealCount = planItems.length;
+        _dayCount = planIds.length;
         _hasPlan = true;
         _isLoading = false;
       });
@@ -157,6 +167,49 @@ class _GroceryScreenState extends State<GroceryScreen> {
     }
   }
 
+  Future<List<Map<String, dynamic>>> _fetchRows(
+    String userId,
+    List<String> planIds,
+  ) => Supabase.instance.client
+      .from('grocery_items')
+      .select()
+      .eq('user_id', userId)
+      .inFilter('plan_id', planIds);
+
+  // Combines the same ingredient from different days into one row.
+  List<GroceryItem> _merge(List<Map<String, dynamic>> rows) {
+    final byName = <String, _Aggregate>{};
+    final ids = <String, List<String>>{};
+    final bought = <String, bool>{};
+
+    for (final r in rows) {
+      final name = (r['name'] as String? ?? '').trim();
+      final meal = r['meal_type'] as String? ?? 'Other';
+      final key = '$meal|${name.toLowerCase()}';
+      final agg = byName.putIfAbsent(
+        key,
+        () => _Aggregate(name, r['category'] as String? ?? 'Pantry', meal),
+      );
+      for (final part in (r['quantity'] as String? ?? '').split(' + ')) {
+        agg.add(part);
+      }
+      ids.putIfAbsent(key, () => []).add(r['id'] as String);
+      bought[key] = (bought[key] ?? true) && (r['is_checked'] as bool? ?? false);
+    }
+
+    return [
+      for (final e in byName.entries)
+        GroceryItem(
+          ids: ids[e.key]!,
+          name: e.value.name,
+          quantity: e.value.formatted,
+          category: e.value.category,
+          mealType: e.value.mealType,
+          isBought: bought[e.key]!,
+        ),
+    ]..sort((a, b) => a.name.compareTo(b.name));
+  }
+
   // Merges the same ingredient across meals, summing quantities that share a
   // unit. Mismatched units are listed side by side rather than guessed at.
   Future<void> _buildListFromPlan(
@@ -169,6 +222,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
     for (final item in planItems) {
       final ingredients = (item as Map)['ingredients'];
       if (ingredients is! List) continue;
+      final meal = item['meal_type'] as String? ?? 'Other';
 
       for (final raw in ingredients) {
         if (raw is! Map) continue;
@@ -177,8 +231,12 @@ class _GroceryScreenState extends State<GroceryScreen> {
 
         merged
             .putIfAbsent(
-              name.toLowerCase(),
-              () => _Aggregate(name, raw['category'] as String? ?? 'Pantry'),
+              '$meal|${name.toLowerCase()}',
+              () => _Aggregate(
+                name,
+                raw['category'] as String? ?? 'Pantry',
+                meal,
+              ),
             )
             .add(raw['quantity'] as String? ?? '');
       }
@@ -194,6 +252,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
                 (agg) => {
                   'user_id': userId,
                   'plan_id': planId,
+                  'meal_type': agg.mealType,
                   'name': agg.name,
                   'quantity': agg.formatted,
                   'category': categoryOrder.contains(agg.category)
@@ -205,15 +264,42 @@ class _GroceryScreenState extends State<GroceryScreen> {
         );
   }
 
+  // Checks off everything left, then confirms the trip is done.
+  Future<void> _finishShopping() async {
+    final remaining = _items.where((i) => !i.isBought).toList();
+    final ids = [for (final i in remaining) ...i.ids];
+
+    if (ids.isNotEmpty) {
+      try {
+        await Supabase.instance.client
+            .from('grocery_items')
+            .update({'is_checked': true})
+            .inFilter('id', ids);
+        if (mounted) {
+          setState(() {
+            for (final i in remaining) {
+              i.isBought = true;
+            }
+          });
+        }
+      } catch (e) {
+        debugPrint('Failed to finish shopping: $e');
+        return;
+      }
+    }
+
+    if (mounted) _showSuccessModal();
+  }
+
   Future<void> _toggleItem(GroceryItem item, bool value) async {
     setState(() => item.isBought = value);
-    if (item.id == null) return;
+    if (item.ids.isEmpty) return;
 
     try {
       await Supabase.instance.client
           .from('grocery_items')
           .update({'is_checked': value})
-          .eq('id', item.id!);
+          .inFilter('id', item.ids);
     } catch (e) {
       debugPrint('Failed to update item: $e');
       if (mounted) setState(() => item.isBought = !value);
@@ -222,15 +308,16 @@ class _GroceryScreenState extends State<GroceryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Sections follow the meal each ingredient is for.
     final groupedItems = <String, List<GroceryItem>>{};
     for (final item in _items) {
-      groupedItems.putIfAbsent(item.category, () => []).add(item);
+      groupedItems.putIfAbsent(item.mealType, () => []).add(item);
     }
 
     final sortedCategories = groupedItems.keys.toList()
       ..sort((a, b) {
-        final ai = categoryOrder.indexOf(a);
-        final bi = categoryOrder.indexOf(b);
+        final ai = mealOrder.indexOf(a);
+        final bi = mealOrder.indexOf(b);
         return (ai == -1 ? 99 : ai).compareTo(bi == -1 ? 99 : bi);
       });
 
@@ -318,7 +405,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
           const Expanded(
             child: HeaderTitle(
               title: "Grocery",
-              subtitle: "From your meal plan",
+              subtitle: "For your next 7 days of meals",
             ),
           ),
           IconButton(
@@ -417,7 +504,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                "Generate a meal plan first and its ingredients will appear here.",
+                "Plan meals for today or the coming days and their ingredients will appear here.",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
@@ -448,9 +535,9 @@ class _GroceryScreenState extends State<GroceryScreen> {
       'Dec',
     ];
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final now = DateTime.now();
+    final end = DateTime.now().add(const Duration(days: 6));
     final dateLabel =
-        '${days[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
+        'Today to ${days[end.weekday - 1]}, ${months[end.month - 1]} ${end.day}';
 
     return Container(
       margin: const EdgeInsets.only(top: 10),
@@ -474,7 +561,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
                 ),
               ),
               Text(
-                "Preparation for $_mealCount meals",
+                "$_mealCount meals across $_dayCount planned days",
                 style: const TextStyle(color: textSecondary, fontSize: 13),
               ),
             ],
@@ -607,7 +694,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
               borderRadius: BorderRadius.circular(18),
             ),
           ),
-          onPressed: () => _showSuccessModal(),
+          onPressed: _finishShopping,
           child: const Text(
             "Finish Shopping",
             style: TextStyle(
@@ -696,14 +783,15 @@ class _GroceryScreenState extends State<GroceryScreen> {
   }
 }
 
-// Collects one ingredient as it appears across several meals.
+// Collects one ingredient for one meal as it appears across several days.
 class _Aggregate {
   final String name;
   final String category;
+  final String mealType;
   final Map<String, double> _byUnit = {};
   final List<String> _unparsed = [];
 
-  _Aggregate(this.name, this.category);
+  _Aggregate(this.name, this.category, [this.mealType = 'Other']);
 
   void add(String quantity) {
     final match = RegExp(r'^\s*([\d.]+)\s*(.*)$').firstMatch(quantity.trim());

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/meal_log_service.dart';
 import 'package:smart_plate/features/auth/widgets/settings_form.dart';
 
 // Edits the calorie target, macro goals and weight goal used across the app.
@@ -130,10 +131,15 @@ class _NutritionalGoalsSettingsScreenState
           })
           .eq('id', user.id);
 
+      // Plans made for the old targets can be regenerated to match the new ones.
+      final upcoming = await MealLogService.reopenUpcomingPlans();
+
       if (!mounted) return;
       setState(() {
         _isSaving = false;
-        _message = 'Goals saved.';
+        _message = upcoming > 0
+            ? 'Goals saved. Regenerate your upcoming meal plans to match them.'
+            : 'Goals saved.';
         _messageIsError = false;
       });
     } on PostgrestException catch (e) {

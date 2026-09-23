@@ -24,16 +24,16 @@ right, publishing the key changes nothing.
 | Value | Where it lives | Used by |
 | --- | --- | --- |
 | Supabase `service_role` key | Supabase secrets only | Never needed by this app |
-| Model API key (`GEMINI_API_KEY`) | Supabase secrets | `generate-meal-plan` Edge Function |
+| Model API key (`OPENAI_API_KEY`) | Supabase secrets | `generate-meal-plan` Edge Function |
 | SMTP password / email API key | Supabase Auth settings or Edge Function secrets | Transactional email |
 
 Set with:
 
 ```
-supabase secrets set GEMINI_API_KEY=...
+supabase secrets set OPENAI_API_KEY=...
 ```
 
-Read inside a function with `Deno.env.get('GEMINI_API_KEY')`. The value is never
+Read inside a function with `Deno.env.get('OPENAI_API_KEY')`. The value is never
 returned to the client and never appears in the repo.
 
 The `service_role` key deserves specific mention: it **bypasses RLS entirely**.
@@ -96,10 +96,9 @@ skipped.
 
 ## Restrictions worth applying
 
-- **Gemini key:** restrict it to the Generative Language API in AI Studio.
-  Unrestricted keys are rejected by the API and are the ones automated scanners
-  hunt for in public repos.
-- **Billing alerts:** set one in Google Cloud Console. A leaked key or a
-  runaway retry loop shows up as spend before it shows up anywhere else.
-- **Rate limiting:** the regenerate button has no cap. Add a per-user daily
-  limit inside the Edge Function before real users touch it.
+- **OpenAI key:** give it an expiration date after the final defense, and keep
+  it in Supabase secrets only.
+- **Spend cap:** use prepaid credits with auto-reload off, so the balance is
+  the ceiling. A leaked key or a runaway retry loop cannot spend past it.
+- **Rate limiting:** the Edge Function allows 2 generations per user per day,
+  tracked in the `ai_usage` table.

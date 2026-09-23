@@ -176,14 +176,14 @@ Each step is usable on its own and unblocks the next.
 
 ## Open questions
 
-- **Model provider.** Affects the Edge Function's HTTP call and the JSON mode
-  available. Needs deciding before step 2.
+- **Model provider.** Decided: OpenAI `gpt-6-luna` via the Responses API with
+  strict structured outputs and low reasoning effort.
 - **Cost ceiling.** Meal plan generation per user per day is the main spend.
   Consider generating a week at a time instead of a day.
 - **Offline behavior.** Plans are cached in Postgres but still need network.
   Decide whether to cache the current day locally via `shared_preferences`.
-- **Regeneration limits.** Without a cap, a user can spam regenerate. Suggest a
-  daily limit enforced in the function.
+- **Regeneration limits.** Decided: 2 generations per user per Manila day,
+  enforced in the function and logged in `ai_usage`.
 
 ## Security notes
 

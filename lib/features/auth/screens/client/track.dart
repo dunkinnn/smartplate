@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/models/food_entry.dart';
+import 'package:smart_plate/features/auth/services/meal_log_service.dart';
 import 'package:smart_plate/features/auth/screens/client/log_meal.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
@@ -34,6 +35,10 @@ class _TrackScreenState extends State<TrackScreen> {
   int? calorieTarget;
   bool isLoading = true;
 
+  // The day's generated plan by meal type, shown until the meal is eaten.
+  Map<String, List<FoodEntry>> planByMeal = {};
+  String? _togglingMeal;
+
   @override
   void initState() {
     super.initState();
@@ -46,7 +51,7 @@ class _TrackScreenState extends State<TrackScreen> {
       '${d.day.toString().padLeft(2, '0')}';
 
   // Loads the selected day's logs plus the calorie goal they are measured against.
-  Future<void> _loadDay() async {
+  Future<void> _loadDay({bool showSpinner = true}) async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
     if (user == null) {
@@ -54,7 +59,7 @@ class _TrackScreenState extends State<TrackScreen> {
       return;
     }
 
-    setState(() => isLoading = true);
+    if (showSpinner) setState(() => isLoading = true);
 
     try {
       final rows = await supabase
@@ -70,6 +75,21 @@ class _TrackScreenState extends State<TrackScreen> {
           .eq('id', user.id)
           .maybeSingle();
 
+      final plan = await supabase
+          .from('meal_plans')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('plan_date', _dateKey(selectedDate))
+          .maybeSingle();
+
+      final planItems = plan == null
+          ? const []
+          : await supabase
+                .from('meal_plan_items')
+                .select('meal_type, name, kcal, protein_g, carbs_g, fat_g')
+                .eq('plan_id', plan['id'])
+                .order('sort_order');
+
       final grouped = <String, List<FoodEntry>>{};
       for (final row in rows as List) {
         final map = row as Map<String, dynamic>;
@@ -77,9 +97,17 @@ class _TrackScreenState extends State<TrackScreen> {
         grouped.putIfAbsent(meal, () => []).add(FoodEntry.fromRow(map));
       }
 
+      final planned = <String, List<FoodEntry>>{};
+      for (final row in planItems) {
+        final map = row as Map<String, dynamic>;
+        final meal = map['meal_type'] as String? ?? 'Snack';
+        planned.putIfAbsent(meal, () => []).add(FoodEntry.fromPlanItem(map));
+      }
+
       if (!mounted) return;
       setState(() {
         logsByMeal = grouped;
+        planByMeal = planned;
         calorieTarget = (profile?['calorie_target'] as num?)?.round();
         isLoading = false;
       });
@@ -93,11 +121,47 @@ class _TrackScreenState extends State<TrackScreen> {
       .expand((list) => list)
       .fold(0, (sum, food) => sum + food.kcal);
 
-  Future<void> _openLogMeal() async {
+  // Only today can be changed; other days are read-only history or plans.
+  bool get _isToday => _dateKey(selectedDate) == _dateKey(DateTime.now());
+
+  bool get _isFuture =>
+      _dateKey(selectedDate).compareTo(_dateKey(DateTime.now())) > 0;
+
+  bool _isPlanEaten(String mealType) =>
+      (logsByMeal[mealType] ?? const []).any((f) => f.source == 'plan');
+
+  int get _plannedKcal => planByMeal.values
+      .expand((list) => list)
+      .fold(0, (sum, food) => sum + food.kcal);
+
+  // Marks a planned meal as eaten or undoes it; Home shares the same rows.
+  Future<void> _togglePlanned(String mealType) async {
+    if (_togglingMeal != null) return;
+    setState(() => _togglingMeal = mealType);
+
+    try {
+      await MealLogService.setPlannedMealEaten(
+        date: selectedDate,
+        mealType: mealType,
+        dishes: planByMeal[mealType] ?? const [],
+        eaten: !_isPlanEaten(mealType),
+      );
+      await _loadDay(showSpinner: false);
+    } catch (e) {
+      debugPrint('Failed to update planned meal: $e');
+    }
+
+    if (mounted) setState(() => _togglingMeal = null);
+  }
+
+  Future<void> _openLogMeal(String mealType) async {
     final saved = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => LogMealScreen(initialDate: selectedDate),
+        builder: (context) => LogMealScreen(
+          initialDate: selectedDate,
+          initialMealType: mealType,
+        ),
       ),
     );
     if (saved == true) _loadDay();
@@ -185,19 +249,20 @@ class _TrackScreenState extends State<TrackScreen> {
     );
   }
 
-  // Rolling week ending today.
+  // Three days back, today, and three days ahead.
   Widget _buildHorizontalCalendar() {
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final today = DateTime.now();
     final days = List.generate(
       7,
-      (i) => DateTime(today.year, today.month, today.day - (6 - i)),
+      (i) => DateTime(today.year, today.month, today.day - 3 + i),
     );
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: days.map((date) {
         final isSelected = _dateKey(date) == _dateKey(selectedDate);
+        final isToday = _dateKey(date) == _dateKey(today);
 
         return GestureDetector(
           onTap: () {
@@ -244,6 +309,16 @@ class _TrackScreenState extends State<TrackScreen> {
                     color: isSelected ? Colors.white : textMain,
                     fontWeight: FontWeight.w700,
                   ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              // Dot marks today so the calendar reads the same on every screen.
+              Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: isToday ? brandGreen : Colors.transparent,
+                  shape: BoxShape.circle,
                 ),
               ),
             ],
@@ -358,6 +433,19 @@ class _TrackScreenState extends State<TrackScreen> {
                     ),
                   ),
                 ),
+                if (planByMeal.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    "Plan ${_formatNumber(_plannedKcal)} kcal · "
+                    "${planByMeal.keys.where(_isPlanEaten).length} of "
+                    "${planByMeal.length} meals eaten",
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -385,6 +473,98 @@ class _TrackScreenState extends State<TrackScreen> {
         ),
       ),
     );
+  }
+
+  // Planned dish with an eaten check; shows the logged rows once eaten.
+  List<Widget> _buildPlannedRows(String mealType, List<FoodEntry> items) {
+    final eaten = items.where((f) => f.source == 'plan').toList();
+    final dishes = eaten.isNotEmpty
+        ? eaten
+        : planByMeal[mealType] ?? const <FoodEntry>[];
+    if (dishes.isEmpty) return const [];
+
+    final isEaten = eaten.isNotEmpty;
+    final busy = _togglingMeal == mealType;
+    final label = isEaten
+        ? "FROM YOUR PLAN · EATEN"
+        : _isFuture
+        ? "PLANNED"
+        : _isToday
+        ? "PLANNED · TAP IF EATEN"
+        : "PLANNED · NOT EATEN";
+
+    return [
+      InkWell(
+        onTap: busy || !_isToday ? null : () => _togglePlanned(mealType),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.only(bottom: 4),
+          decoration: BoxDecoration(
+            color: isEaten ? brandGreen.withValues(alpha: 0.08) : bgLight,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              busy
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: brandGreen,
+                      ),
+                    )
+                  : Icon(
+                      isEaten
+                          ? Icons.check_circle_rounded
+                          : _isFuture
+                          ? Icons.schedule_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      color: isEaten ? brandGreen : textSecondary,
+                      size: 20,
+                    ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: isEaten ? brandGreen : textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    ...dishes.map(
+                      (d) => Text(
+                        d.name,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: darkBlue,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                "${dishes.fold(0, (s, d) => s + d.kcal)} kcal",
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ];
   }
 
   Widget _buildTrackMealCard(
@@ -428,7 +608,8 @@ class _TrackScreenState extends State<TrackScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          if (items.isEmpty)
+          ..._buildPlannedRows(title, items),
+          if (items.isEmpty && (planByMeal[title] ?? const []).isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 6),
               child: Text(
@@ -441,7 +622,7 @@ class _TrackScreenState extends State<TrackScreen> {
               ),
             )
           else
-            ...items.map(
+            ...items.where((f) => f.source != 'plan').map(
               (item) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
@@ -471,28 +652,31 @@ class _TrackScreenState extends State<TrackScreen> {
                 ),
               ),
             ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: TextButton.icon(
-              onPressed: _openLogMeal,
-              icon: const Icon(Icons.add_rounded, color: brandGreen, size: 18),
-              label: const Text(
-                "Log Item",
-                style: TextStyle(
-                  color: brandGreen,
-                  fontWeight: FontWeight.w800,
+          // Extra foods can only be logged for today.
+          if (_isToday) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: TextButton.icon(
+                onPressed: () => _openLogMeal(title),
+                icon: const Icon(Icons.add_rounded, color: brandGreen, size: 18),
+                label: const Text(
+                  "Log Item",
+                  style: TextStyle(
+                    color: brandGreen,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              style: TextButton.styleFrom(
-                backgroundColor: bgLight,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                style: TextButton.styleFrom(
+                  backgroundColor: bgLight,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

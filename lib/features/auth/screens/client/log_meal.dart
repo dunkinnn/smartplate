@@ -7,7 +7,8 @@ import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
 class LogMealScreen extends StatefulWidget {
   final DateTime? initialDate;
-  const LogMealScreen({super.key, this.initialDate});
+  final String? initialMealType;
+  const LogMealScreen({super.key, this.initialDate, this.initialMealType});
 
   @override
   State<LogMealScreen> createState() => _LogMealScreenState();
@@ -39,6 +40,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
   void initState() {
     super.initState();
     selectedDate = widget.initialDate ?? DateTime.now();
+    selectedMealType = widget.initialMealType ?? selectedMealType;
     _loadSavedFoods();
   }
 

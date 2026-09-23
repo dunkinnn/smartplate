@@ -2,10 +2,11 @@
 
 Steps to deploy `generate-meal-plan`. Run from the project root.
 
-## 1. Get a Gemini API key
+## 1. Get an OpenAI API key
 
-Sign in at [Google AI Studio](https://aistudio.google.com/apikey) and create a
-key. The free tier is enough for development.
+Buy prepaid credits at [platform.openai.com](https://platform.openai.com)
+(Settings, Billing) with auto-reload off, then create a secret key under
+Settings, API keys. Copy it once; it is not shown again.
 
 ## 2. Install the Supabase CLI
 
@@ -28,7 +29,7 @@ supabase link --project-ref <ref>
 Never put this in the repo, in the Flutter app, or in a committed `.env`.
 
 ```
-supabase secrets set GEMINI_API_KEY=your_key_here
+supabase secrets set OPENAI_API_KEY=your_key_here
 ```
 
 ## 5. Deploy
@@ -58,5 +59,10 @@ reliable route.
 - Allergens are re-checked in code after the model responds. If a dish or
   ingredient matches an allergen, the plan is rejected and regenerated once
   before the request fails.
-- Swapping providers means editing `GEMINI_URL`, `callGemini`, and the secret
+- The model defaults to `gpt-6-luna`. Switch without redeploying with
+  `supabase secrets set OPENAI_MODEL=gpt-6-sol`.
+- Each user gets 2 generations per Manila calendar day, counted in `ai_usage`.
+  A plan with `saved_at` set cannot be regenerated.
+  Run `supabase/ai-usage-table.sql` in the SQL editor before deploying.
+- Swapping providers means editing `OPENAI_URL`, `callOpenAI`, and the secret
   name in `index.ts`. Nothing else in the app depends on the provider.

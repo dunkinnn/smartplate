@@ -192,8 +192,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
           const SizedBox(width: 56), // Matches trailing icon plus padding
           const Expanded(
             child: HeaderTitle(
-              title: "Performance",
-              subtitle: "Weekly Health Performance",
+              title: "Insights",
+              subtitle: "Your week at a glance",
             ),
           ),
           IconButton(
@@ -509,8 +509,56 @@ class _InsightsScreenState extends State<InsightsScreen> {
     );
   }
 
-  // Placeholder until the model API is available. Left visible so the card
-  // does not silently disappear from the design.
+  // Tips computed from this week's logs; descriptive, never medical.
+  List<String> get _adviceTips {
+    final days = _loggedDays;
+    if (days.isEmpty) {
+      return [
+        'Mark meals as eaten in Track or on Home to get tips for your week.',
+      ];
+    }
+
+    final tips = <String>[];
+    final target = _calorieTarget;
+    if (target != null && target > 0) {
+      final diff = _avgKcal - target;
+      if (diff.abs() <= target * 0.1) {
+        tips.add(
+          'Your average intake is within 10% of your ${_formatNumber(target)} kcal goal. Keep it up.',
+        );
+      } else if (diff > 0) {
+        tips.add(
+          'You averaged ${_formatNumber(diff)} kcal above your goal on logged days.',
+        );
+      } else {
+        tips.add(
+          'You averaged ${_formatNumber(-diff)} kcal below your goal on logged days.',
+        );
+      }
+    }
+
+    final macros = {
+      'Protein': (_avgMacro((d) => d.protein), _proteinGoal),
+      'Carbs': (_avgMacro((d) => d.carbs), _carbsGoal),
+      'Fat': (_avgMacro((d) => d.fat), _fatGoal),
+    };
+    for (final m in macros.entries) {
+      final (avg, goal) = m.value;
+      if (goal != null && goal > 0 && avg < goal * 0.8) {
+        tips.add(
+          '${m.key} was below your goal: ${avg.round()} g of ${goal.round()} g on average.',
+        );
+      }
+    }
+
+    if (days.length < 7) {
+      tips.add(
+        'You logged ${days.length} of the last 7 days. More logged days make these tips more accurate.',
+      );
+    }
+    return tips.take(3).toList();
+  }
+
   Widget _buildAIInsightsCard() {
     return Container(
       width: double.infinity,
@@ -527,7 +575,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
               Icon(Icons.auto_awesome_rounded, color: Colors.amber, size: 20),
               SizedBox(width: 10),
               Text(
-                "AI SMART ADVICE",
+                "SMART ADVICE",
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,
@@ -538,13 +586,11 @@ class _InsightsScreenState extends State<InsightsScreen> {
             ],
           ),
           const SizedBox(height: 20),
-          _buildInsightBullet(
-            "Personalised advice will appear here once your AI provider is connected.",
-          ),
-          const SizedBox(height: 12),
-          _buildInsightBullet(
-            "Keep logging meals so there is a full week of data to analyse.",
-          ),
+          for (final tip in _adviceTips)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildInsightBullet(tip),
+            ),
         ],
       ),
     );

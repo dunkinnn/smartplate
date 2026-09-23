@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/meal_log_service.dart';
 import 'package:smart_plate/features/auth/widgets/settings_form.dart';
 
 // Edits the diet, taste, allergen and restriction fields the meal plan
@@ -97,10 +98,15 @@ class _DietaryPreferencesScreenState extends State<DietaryPreferencesScreen> {
           })
           .eq('id', user.id);
 
+      // Plans made with the old preferences may now include an allergen.
+      final upcoming = await MealLogService.reopenUpcomingPlans();
+
       if (!mounted) return;
       setState(() {
         _isSaving = false;
-        _message = 'Preferences saved.';
+        _message = upcoming > 0
+            ? 'Preferences saved. Regenerate your upcoming meal plans so they match.'
+            : 'Preferences saved.';
         _messageIsError = false;
       });
     } on PostgrestException catch (e) {
