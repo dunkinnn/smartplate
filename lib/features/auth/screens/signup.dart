@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'login.dart';
 import 'profile.dart';
 
@@ -227,11 +228,11 @@ class _SignupScreenState extends State<SignupScreen> {
       }
     } on AuthException catch (e) {
       if (mounted) {
-        setState(() => _emailError = e.message);
+        setState(() => _emailError = friendlyError(e));
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _emailError = 'Something went wrong. Please try again.');
+        setState(() => _emailError = friendlyError(e));
       }
     }
 

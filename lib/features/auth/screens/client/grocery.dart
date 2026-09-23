@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:smart_plate/features/auth/widgets/notification_bell.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:smart_plate/features/auth/screens/client/notification.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 import 'package:smart_plate/features/auth/widgets/meal_badge.dart';
 
@@ -177,7 +178,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _error = e.toString();
+          _error = friendlyError(e);
         });
       }
     }
@@ -400,22 +401,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
               subtitle: "For today's meal plan",
             ),
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              color: textSecondary,
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => NotificationScreen(
-                    onBackToHome: () => Navigator.pop(context),
-                  ),
-                ),
-              );
-            },
-          ),
+          const NotificationBell(),
           const SizedBox(width: 8),
         ],
       ),
@@ -556,7 +542,9 @@ class _GroceryScreenState extends State<GroceryScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
+              // Expanded lets a long date range wrap instead of pushing the chip off screen.
+              Expanded(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -572,7 +560,9 @@ class _GroceryScreenState extends State<GroceryScreen> {
                     style: const TextStyle(color: textSecondary, fontSize: 13),
                   ),
                 ],
+                ),
               ),
+              const SizedBox(width: 12),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,

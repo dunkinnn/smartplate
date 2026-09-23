@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'login.dart';
 
 class UpdatePasswordScreen extends StatefulWidget {
@@ -88,11 +89,11 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
       }
     } on AuthException catch (e) {
       if (mounted) {
-        setState(() => _authError = e.message);
+        setState(() => _authError = friendlyError(e));
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _authError = 'Something went wrong. Please try again.');
+        setState(() => _authError = friendlyError(e));
       }
     }
 

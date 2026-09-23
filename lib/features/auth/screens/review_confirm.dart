@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:smart_plate/features/auth/widgets/onboarding_progress.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/screens/client/dashboard.dart';
 
 class ReviewConfirmScreen extends StatefulWidget {
@@ -77,7 +79,7 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Database Error: ${e.message}'),
+            content: Text(friendlyError(e)),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -134,13 +136,11 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Step 4 of 4 – Review & Confirm',
-          style: TextStyle(
-            color: darkBlue,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+        titleSpacing: 0,
+        toolbarHeight: 84,
+        title: const Padding(
+          padding: EdgeInsets.only(right: 24),
+          child: OnboardingProgress(step: 4, title: 'Review & Confirm'),
         ),
       ),
       body: SingleChildScrollView(

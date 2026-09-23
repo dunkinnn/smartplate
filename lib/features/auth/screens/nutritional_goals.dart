@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smart_plate/features/auth/widgets/onboarding_progress.dart';
 import 'package:smart_plate/features/auth/screens/review_confirm.dart';
 
 class NutritionalGoalsScreen extends StatefulWidget {
@@ -82,13 +83,11 @@ class _NutritionalGoalsScreenState extends State<NutritionalGoalsScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Step 3 of 4 – Nutritional Goals',
-          style: TextStyle(
-            color: darkBlue,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+        titleSpacing: 0,
+        toolbarHeight: 84,
+        title: const Padding(
+          padding: EdgeInsets.only(right: 24),
+          child: OnboardingProgress(step: 3, title: 'Nutritional Goals'),
         ),
       ),
       body: SingleChildScrollView(

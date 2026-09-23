@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:smart_plate/features/auth/widgets/notification_bell.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/services/calendar_days.dart';
 import 'package:smart_plate/features/auth/models/food_entry.dart';
 import 'package:smart_plate/features/auth/services/meal_log_service.dart';
 import 'package:smart_plate/features/auth/screens/client/log_meal.dart';
-import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 import 'package:smart_plate/features/auth/widgets/meal_badge.dart';
 
@@ -269,22 +269,7 @@ class _TrackScreenState extends State<TrackScreen> {
               subtitle: "Log meals & monitor nutrition",
             ),
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              color: textSecondary,
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => NotificationScreen(
-                    onBackToHome: () => Navigator.pop(context),
-                  ),
-                ),
-              );
-            },
-          ),
+          const NotificationBell(),
           const SizedBox(width: 8),
         ],
       ),
@@ -297,17 +282,13 @@ class _TrackScreenState extends State<TrackScreen> {
     final today = DateTime.now();
     final days = visibleDays();
 
-    // A full week spreads out; fewer days since signup sit to the left.
+    // Each day takes an equal share of the width, so it fits any screen size.
     return Row(
-      mainAxisAlignment: days.length == 7
-          ? MainAxisAlignment.spaceBetween
-          : MainAxisAlignment.start,
       children: days.map((date) {
         final isSelected = _dateKey(date) == _dateKey(selectedDate);
         final isToday = _dateKey(date) == _dateKey(today);
 
-        return Padding(
-          padding: EdgeInsets.only(right: days.length == 7 ? 0 : 12),
+        return Expanded(
           child: GestureDetector(
             onTap: () {
               setState(() => selectedDate = date);
@@ -315,7 +296,9 @@ class _TrackScreenState extends State<TrackScreen> {
             },
             child: Column(
               children: [
-                Text(
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
                   isToday ? 'Today' : dayNames[date.weekday - 1],
                   style: TextStyle(
                     color: isSelected ? darkBlue : textSecondary,
@@ -325,13 +308,13 @@ class _TrackScreenState extends State<TrackScreen> {
                         : FontWeight.normal,
                   ),
                 ),
+                ),
                 const SizedBox(height: 10),
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: 14,
-                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: isSelected ? brandGreen : Colors.white,
                     borderRadius: BorderRadius.circular(16),

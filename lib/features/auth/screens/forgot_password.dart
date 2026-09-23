@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'otp_verification.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -133,7 +134,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             _resendCountdown = 300; // 5 minutes
             _startResendCooldown();
           } else {
-            _authMessage = 'Error: ${e.message}';
+            _authMessage = friendlyError(e);
           }
         });
       }

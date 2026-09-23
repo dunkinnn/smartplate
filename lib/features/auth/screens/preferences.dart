@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smart_plate/features/auth/widgets/onboarding_progress.dart';
 import 'package:smart_plate/features/auth/screens/nutritional_goals.dart';
 
 class PreferencesScreen extends StatefulWidget {
@@ -49,13 +50,11 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Step 2 of 4 – Preferences & Restrictions',
-          style: TextStyle(
-            color: darkBlue,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+        titleSpacing: 0,
+        toolbarHeight: 84,
+        title: const Padding(
+          padding: EdgeInsets.only(right: 24),
+          child: OnboardingProgress(step: 2, title: 'Preferences & Restrictions'),
         ),
       ),
       body: SingleChildScrollView(

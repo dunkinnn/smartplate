@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/widgets/settings_form.dart';
 
 // Password change. Supabase handles hashing; nothing is stored by the app.
@@ -90,7 +91,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
       if (!mounted) return;
       setState(() {
         _isSaving = false;
-        _message = e.message;
+        _message = friendlyError(e);
         _messageIsError = true;
       });
     }

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:smart_plate/features/auth/widgets/notification_bell.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/services/calendar_days.dart';
-import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 import 'package:smart_plate/features/auth/widgets/meal_badge.dart';
 import 'package:smart_plate/features/auth/services/meal_log_service.dart';
@@ -125,7 +126,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _error = e.toString();
+          _error = friendlyError(e);
         });
       }
     }
@@ -178,14 +179,15 @@ class _InsightsScreenState extends State<InsightsScreen> {
                       child: Column(
                         children: [
                           SizedBox(height: GlassHeader.insetFor(context) + 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          // Wraps to a second line on narrow screens.
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 10,
+                            runSpacing: 8,
                             children: [
                               _buildDateSelector(),
-                              if (_streak > 0) ...[
-                                const SizedBox(width: 10),
-                                StreakPill(days: _streak),
-                              ],
+                              if (_streak > 0) StreakPill(days: _streak),
                             ],
                           ),
                           const SizedBox(height: 25),
@@ -219,22 +221,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
               subtitle: "Your week at a glance",
             ),
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              color: textSecondary,
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => NotificationScreen(
-                    onBackToHome: () => Navigator.pop(context),
-                  ),
-                ),
-              );
-            },
-          ),
+          const NotificationBell(),
           const SizedBox(width: 8),
         ],
       ),

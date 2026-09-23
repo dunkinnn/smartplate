@@ -1,13 +1,13 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:smart_plate/features/auth/widgets/notification_bell.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/services/calendar_days.dart';
 import 'package:smart_plate/features/auth/screens/client/grocery.dart';
 import 'package:smart_plate/features/auth/screens/client/insight.dart';
 import 'package:smart_plate/features/auth/screens/client/meal_plan.dart';
 import 'package:smart_plate/features/auth/screens/client/track.dart';
-import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/screens/client/profile.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -268,50 +268,107 @@ class _DashboardScreenState extends State<DashboardScreen> {
       extendBodyBehindAppBar: true,
       appBar: _selectedIndex == 0 ? _buildHomeAppBar() : null,
       body: IndexedStack(index: _selectedIndex, children: pages),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _selectTab,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: brandGreen,
-        unselectedItemColor: textSecondary,
-        showSelectedLabels: true,
-        showUnselectedLabels: true,
-        selectedFontSize: 12,
-        unselectedFontSize: 12,
-        items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.home_filled),
-            label: 'Home',
+      bottomNavigationBar: _buildNavBar(),
+    );
+  }
+
+  // Flat bar with Track raised in the centre, since logging is the main daily action.
+  // Height comes from the content, so larger fonts or small screens never overflow.
+  Widget _buildNavBar() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: borderColor)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildNavItem(0, Icons.home_rounded, 'Home'),
+              _buildNavItem(1, Icons.restaurant_menu_rounded, 'Meal Plan'),
+              _buildNavItem(3, Icons.add_rounded, 'Track', raised: true),
+              _buildNavItem(2, Icons.storefront_rounded, 'Grocery'),
+              _buildNavItem(4, Icons.bar_chart_rounded, 'Insights'),
+            ],
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.restaurant_menu),
-            label: 'Meal Plan',
-          ),
-          BottomNavigationBarItem(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: brandGreen,
-                borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(
+    int index,
+    IconData icon,
+    String label, {
+    bool raised = false,
+  }) {
+    final selected = _selectedIndex == index;
+    final color = selected ? brandGreen : textSecondary;
+
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _selectTab(index),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 26,
+                child: raised
+                    // The circle overflows upward so it sits above the bar.
+                    ? OverflowBox(
+                        maxHeight: 50,
+                        maxWidth: 50,
+                        alignment: Alignment.bottomCenter,
+                        child: _buildLogCircle(),
+                      )
+                    : Icon(icon, size: 24, color: color),
               ),
-              child: const Icon(
-                Icons.storefront,
-                color: Colors.white,
-                size: 20,
+              const SizedBox(height: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: color,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
-            label: 'Grocery',
+            ],
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.edit_note),
-            label: 'Track',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
-            label: 'Insights',
+        ),
+      ),
+    );
+  }
+
+  // Raised green circle for Track, where meals are logged.
+  Widget _buildLogCircle() {
+    return Container(
+      height: 50,
+      width: 50,
+      decoration: BoxDecoration(
+        color: brandGreen,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: brandGreen.withValues(alpha: 0.35),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
+      child: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
     );
   }
 
@@ -377,20 +434,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       actions: [
-        IconButton(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => NotificationScreen(
-                onBackToHome: () => Navigator.pop(context),
-              ),
-            ),
-          ),
-          icon: const Icon(
-            Icons.notifications_none_rounded,
-            color: textSecondary,
-          ),
-        ),
+        const NotificationBell(),
         GestureDetector(
           onTap: () => Navigator.push(
             context,

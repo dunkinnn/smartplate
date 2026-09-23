@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:smart_plate/features/auth/widgets/notification_bell.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/services/calendar_days.dart';
-import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
 class MealPlanScreen extends StatefulWidget {
@@ -162,19 +163,9 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
       }
 
       await _loadPlan();
-    } on FunctionException catch (e) {
-      // Non-2xx responses carry the function's error message in details.
-      final details = e.details;
-      final error = details is Map ? details['error'] : null;
-      if (mounted) {
-        setState(
-          () => _message = error?.toString() ?? 'Could not generate a plan.',
-        );
-      }
     } catch (e) {
-      if (mounted) {
-        setState(() => _message = e.toString().replaceFirst('Exception: ', ''));
-      }
+      // Covers function errors (e.g. the daily limit) and network failures.
+      if (mounted) setState(() => _message = friendlyError(e));
     }
 
     if (mounted) setState(() => isGenerating = false);
@@ -282,22 +273,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
               subtitle: "Your AI meal plan for today",
             ),
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              color: textSecondary,
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => NotificationScreen(
-                    onBackToHome: () => Navigator.pop(context),
-                  ),
-                ),
-              );
-            },
-          ),
+          const NotificationBell(),
           const SizedBox(width: 8),
         ],
       ),
@@ -310,17 +286,13 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     final today = DateTime.now();
     final days = visibleDays();
 
-    // A full week spreads out; fewer days since signup sit to the left.
+    // Each day takes an equal share of the width, so it fits any screen size.
     return Row(
-      mainAxisAlignment: days.length == 7
-          ? MainAxisAlignment.spaceBetween
-          : MainAxisAlignment.start,
       children: days.map((date) {
         final isSelected = _dateKey(date) == _dateKey(selectedDate);
         final isToday = _dateKey(date) == _dateKey(today);
 
-        return Padding(
-          padding: EdgeInsets.only(right: days.length == 7 ? 0 : 12),
+        return Expanded(
           child: GestureDetector(
             onTap: () {
               setState(() => selectedDate = date);
@@ -328,7 +300,9 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
             },
             child: Column(
               children: [
-                Text(
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
                   isToday ? 'Today' : dayNames[date.weekday - 1],
                   style: TextStyle(
                     color: isSelected ? darkBlue : textSecondary,
@@ -338,13 +312,13 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                         : FontWeight.normal,
                   ),
                 ),
+                ),
                 const SizedBox(height: 10),
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: 14,
-                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: isSelected ? brandGreen : Colors.white,
                     borderRadius: BorderRadius.circular(16),

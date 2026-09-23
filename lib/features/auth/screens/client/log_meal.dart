@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:smart_plate/features/auth/widgets/notification_bell.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/models/food_entry.dart';
 import 'package:smart_plate/features/auth/screens/client/custom_food.dart';
-import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
 class LogMealScreen extends StatefulWidget {
@@ -169,9 +170,9 @@ class _LogMealScreenState extends State<LogMealScreen> {
 
       if (mounted) Navigator.pop(context, true);
     } on PostgrestException catch (e) {
-      if (mounted) _showMessage(e.message);
+      if (mounted) _showMessage(friendlyError(e));
     } catch (e) {
-      if (mounted) _showMessage('Something went wrong. Please try again.');
+      if (mounted) _showMessage(friendlyError(e));
     }
 
     if (mounted) setState(() => isSaving = false);
@@ -277,22 +278,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
               subtitle: "Keep your streak alive",
             ),
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              color: textSecondary,
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => NotificationScreen(
-                    onBackToHome: () => Navigator.pop(context),
-                  ),
-                ),
-              );
-            },
-          ),
+          const NotificationBell(),
         ],
       ),
     );

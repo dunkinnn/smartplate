@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:smart_plate/features/auth/widgets/onboarding_progress.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:smart_plate/features/auth/screens/preferences.dart';
@@ -132,13 +133,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Step 1 of 4 - Personal Information',
-          style: TextStyle(
-            color: Color(0xFF334155),
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+        titleSpacing: 0,
+        toolbarHeight: 84,
+        title: const Padding(
+          padding: EdgeInsets.only(right: 24),
+          child: OnboardingProgress(step: 1, title: 'Personal Information'),
         ),
       ),
       body: SingleChildScrollView(

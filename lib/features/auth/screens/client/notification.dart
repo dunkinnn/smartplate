@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
 // An alert derived from the user's own logs, not stored server side.
@@ -22,6 +23,36 @@ class AppNotification {
     required this.icon,
     required this.iconColor,
   });
+}
+
+// Today's unread notifications, used for the badge on the bell icon.
+Future<int> unreadNotificationCount() async {
+  final supabase = Supabase.instance.client;
+  final user = supabase.auth.currentUser;
+  if (user == null) return 0;
+
+  final now = DateTime.now();
+  final today =
+      '${now.year.toString().padLeft(4, '0')}-'
+      '${now.month.toString().padLeft(2, '0')}-'
+      '${now.day.toString().padLeft(2, '0')}';
+
+  final logs = await supabase
+      .from('food_logs')
+      .select('meal_type, kcal, protein_g, created_at')
+      .eq('user_id', user.id)
+      .eq('logged_date', today);
+  final profile = await supabase
+      .from('user_profiles')
+      .select('calorie_target, protein_goal_g')
+      .eq('id', user.id)
+      .maybeSingle();
+  final prefs = await SharedPreferences.getInstance();
+  final read = (prefs.getStringList('notifications_read_$today') ?? []).toSet();
+
+  return _NotificationScreenState._buildNotifications(logs, profile)
+      .where((n) => !read.contains(n.id))
+      .length;
 }
 
 class NotificationScreen extends StatefulWidget {
@@ -109,7 +140,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _error = e.toString();
+          _error = friendlyError(e);
         });
       }
     }
@@ -117,7 +148,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   // Every alert below is a plain statement of what the logs show. No advice,
   // no judgement, and nothing that nudges toward eating less than planned.
-  List<AppNotification> _buildNotifications(
+  static List<AppNotification> _buildNotifications(
     List logs,
     Map<String, dynamic>? profile,
   ) {
@@ -223,7 +254,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return result;
   }
 
-  String _fmt(int value) => value.toString().replaceAllMapped(
+  static String _fmt(int value) => value.toString().replaceAllMapped(
     RegExp(r'(\d)(?=(\d{3})+$)'),
     (m) => '${m[1]},',
   );

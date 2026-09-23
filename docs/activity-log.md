@@ -159,3 +159,56 @@
 - Insights: streak pill beside the week date chip.
 - Home unchanged.
 - Not committed.
+
+## 2026-09-23 - Login, sign up and onboarding polish
+
+- `main.dart`: opens Dashboard when a Supabase session exists, Login otherwise.
+- `login.dart`: "Save Password" removed (it stored the password in plain text); old saved values are cleared on launch. Friendly messages for common auth errors. Keyboard overflow fixed with SafeArea + ConstrainedBox(minHeight). Styled like the app: dark title, grey tagline, filled 16px-radius fields, 55px "Log In" button.
+- `signup.dart`: same styling; button reads "Create Account".
+- New `widgets/onboarding_progress.dart`: step label, title and 4-part progress bar, used in the app bar of the 4 setup screens.
+- Not committed.
+
+## 2026-09-23 - Reverted login, sign up and onboarding polish
+
+- Restored `main.dart`, `login.dart`, `signup.dart` and the 4 onboarding screens to their previous state (Save Password and always-open-Login are back).
+- `widgets/onboarding_progress.dart` moved to `_to_delete/` for manual deletion.
+
+## 2026-09-23 - Reverted login, sign up and onboarding polish
+
+- The previous entry was undone: `main.dart`, `login.dart`, `signup.dart` and the four setup screens match the last commit again; `onboarding_progress.dart` is not in the project.
+- Not committed.
+
+## 2026-09-23 - Stay signed in, onboarding progress, friendly errors
+
+- `main.dart`: opens Dashboard when a Supabase session exists, Login otherwise.
+- New `widgets/onboarding_progress.dart`: "STEP n OF 4", title and a 4-part progress bar, used in the app bar of profile, preferences, nutritional goals and review screens.
+- New `services/friendly_error.dart`: `friendlyError(e)` maps auth, database, Edge Function, network and timeout errors to plain messages; database details are never shown.
+- Used in login, sign up, forgot password, OTP, update password, review and confirm, Log Meal, Meal Plan, Grocery, Insights, Notifications and the four settings screens.
+- Login and sign up styling and Save Password unchanged.
+- Not committed.
+
+## 2026-09-23 - Modern bottom navigation bar
+
+- `dashboard.dart`: Material BottomNavigationBar replaced by a floating rounded white bar (16px side margin, 24px radius, border and soft shadow). The active tab becomes a light-green pill with icon and label; inactive tabs show grey icons only. Same five tabs and `_selectTab` behavior; "Shop" label shown as "Grocery".
+- Not committed.
+
+## 2026-09-23 - Bottom bar with centre log button
+
+- `dashboard.dart`: floating pill bar replaced by a flat white bar with a thin top border. Order: Home, Meal Plan, Track (raised green + circle in the centre), Grocery, Insights. Tabs show icon and label; active is green. Tab indices unchanged.
+- Not committed.
+
+## 2026-09-23 - Nav bar overflow and screen-size fixes
+
+- `dashboard.dart`: nav bar height now comes from its content (no fixed 64px), which fixes the 1px bottom overflow. The Track circle overflows upward via `OverflowBox`; labels scale down to fit.
+- `main.dart`: text scale follows the phone setting but is clamped to 0.9-1.2 so large font settings do not break layouts.
+- Meal Plan and Track calendars: each day takes an equal share of the width (Expanded) instead of fixed padding, so 7 days fit on narrow phones; day labels scale down.
+- Grocery header: date text is Expanded so long ranges wrap. Insights: date chip and streak pill wrap on narrow screens.
+- `login.dart`: fixed full-screen height replaced with ConstrainedBox(minHeight) so the keyboard and small screens do not overflow.
+- Not committed.
+
+## 2026-09-23 - Notification badge
+
+- `notification.dart`: `unreadNotificationCount()` builds today's notifications with the same rules as the screen and subtracts the ones marked read.
+- New `widgets/notification_bell.dart`: bell icon with a red count badge (9+ cap), opens Notifications and refreshes the count on return.
+- Bell replaced on Home, Meal Plan, Grocery, Track, Insights, Log Meal and Custom Food headers.
+- Not committed.

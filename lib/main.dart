@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'features/auth/screens/login.dart';
+import 'features/auth/screens/client/dashboard.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,10 +21,26 @@ class SmartPlateApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    // Supabase keeps the session on the device, so signed-in users skip Login.
+    final signedIn = Supabase.instance.client.auth.currentSession != null;
+
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Smart Plate',
-      home: LoginScreen(),
+      // Honours the phone's font size but caps it so layouts do not break.
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(
+            textScaler: media.textScaler.clamp(
+              minScaleFactor: 0.9,
+              maxScaleFactor: 1.2,
+            ),
+          ),
+          child: child!,
+        );
+      },
+      home: signedIn ? const DashboardScreen() : const LoginScreen(),
     );
   }
 }

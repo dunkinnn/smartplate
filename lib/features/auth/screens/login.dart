@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'signup.dart';
 import 'forgot_password.dart';
 import 'package:smart_plate/features/auth/screens/client/dashboard.dart';
@@ -112,12 +113,12 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } on AuthException catch (e) {
       if (mounted) {
-        setState(() => _authError = e.message);
+        setState(() => _authError = friendlyError(e));
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _authError = 'Something went wrong. Please try again.';
+          _authError = friendlyError(e);
         });
       }
     } finally {
@@ -132,9 +133,12 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
-        child: Container(
-          height: MediaQuery.of(context).size.height,
-          padding: const EdgeInsets.symmetric(horizontal: 30),
+        padding: const EdgeInsets.symmetric(horizontal: 30),
+        // Min height centres the form; unlike a fixed height it never overflows.
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.of(context).size.height,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,

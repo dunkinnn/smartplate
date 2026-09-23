@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/widgets/settings_form.dart';
 
 // Edits the name, photo and body measurements on user_profiles.
@@ -190,7 +191,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       if (!mounted) return;
       setState(() {
         _isSaving = false;
-        _message = e.message;
+        _message = friendlyError(e);
         _messageIsError = true;
       });
     } catch (e) {

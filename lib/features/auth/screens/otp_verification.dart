@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'update_password.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
@@ -105,7 +106,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
               _startLockoutTimer();
             } else {
               _authMessage =
-                  'Verification failed: ${e.message} ($remainingAttempts attempts left)';
+                  '${friendlyError(e)} ($remainingAttempts attempts left)';
             }
           }
         });
@@ -168,7 +169,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     } on AuthException catch (e) {
       if (mounted) {
         setState(() {
-          _authMessage = 'Failed to resend OTP: ${e.message}';
+          _authMessage = friendlyError(e);
         });
       }
       debugPrint('Error resending OTP: ${e.message}');
