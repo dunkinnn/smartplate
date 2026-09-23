@@ -132,10 +132,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .eq('plan_id', plan['id'])
           .order('sort_order');
 
+      // Always Breakfast, Lunch, Dinner, then Snack, whatever order the rows come in.
+      const order = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+      int rank(Map<String, dynamic> i) {
+        final r = order.indexOf(i['meal_type'] as String? ?? '');
+        return r == -1 ? order.length : r;
+      }
+
+      final sorted = List<Map<String, dynamic>>.from(items)
+        ..sort((a, b) => rank(a).compareTo(rank(b)));
+
       if (!mounted) return;
-      setState(
-        () => _todayPlan = List<Map<String, dynamic>>.from(items as List),
-      );
+      setState(() => _todayPlan = sorted);
     } catch (e) {
       debugPrint('Failed to load today\'s plan: $e');
     }

@@ -218,3 +218,8 @@
 - New `screens/splash.dart`: logo scales and fades in, "Smart Plate" and the tagline rise in one after another (about 1.4s), then fades into Home or Login.
 - `main.dart`: `home` is `SplashScreen(next: ...)`, keeping the signed-in check.
 - Not committed.
+
+## 2026-09-23 - Home meal order
+
+- `dashboard.dart`: Today's Meal Plan on Home is sorted Breakfast, Lunch, Dinner, Snack in the app, not only by `sort_order`.
+- Not committed.
