@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/calendar_days.dart';
 import 'package:smart_plate/features/auth/screens/client/grocery.dart';
 import 'package:smart_plate/features/auth/screens/client/insight.dart';
 import 'package:smart_plate/features/auth/screens/client/meal_plan.dart';
@@ -42,12 +43,61 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Planned meal types already marked as eaten today.
   Set<String> _eatenPlanMeals = {};
 
+  // Consecutive days with at least one logged food, and which recent days count.
+  int _streak = 0;
+  bool _loggedToday = false;
+  Set<String> _loggedDays = {};
+
   @override
   void initState() {
     super.initState();
     _loadProfile();
     _loadTodayLogs();
     _loadTodayPlan();
+    _loadStreak();
+  }
+
+  String _keyFor(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
+  // Counts back from today, or from yesterday while today is not logged yet.
+  Future<void> _loadStreak() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final today = DateTime.now();
+      final rows = await supabase
+          .from('food_logs')
+          .select('logged_date')
+          .eq('user_id', user.id)
+          .gte(
+            'logged_date',
+            _keyFor(today.subtract(const Duration(days: 90))),
+          );
+
+      final days = {for (final r in rows) r['logged_date'] as String};
+      final loggedToday = days.contains(_keyFor(today));
+
+      var streak = 0;
+      var day = loggedToday ? today : today.subtract(const Duration(days: 1));
+      while (days.contains(_keyFor(day))) {
+        streak++;
+        day = day.subtract(const Duration(days: 1));
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _streak = streak;
+        _loggedToday = loggedToday;
+        _loggedDays = days;
+      });
+    } catch (e) {
+      debugPrint('Failed to load streak: $e');
+    }
   }
 
   String get _todayKey {
@@ -186,6 +236,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (index == 0) {
       _loadTodayLogs();
       _loadTodayPlan();
+      _loadStreak();
     }
   }
 
@@ -401,6 +452,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 25),
+          _buildStreakCard(),
+          const SizedBox(height: 15),
           Row(
             children: [
               _buildSummaryCard(
@@ -461,6 +514,110 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
 
           const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+
+  // Current logging streak with this week's days as dots.
+  Widget _buildStreakCard() {
+    const streakColor = Color(0xFFF59E0B);
+    const dayLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    final today = DateTime.now();
+    // Same 7-day week from signup as the other screens.
+    final lastWeek = visibleDays();
+
+    final message = _streak == 0
+        ? "Log a meal today to start a streak."
+        : _loggedToday
+        ? "You logged today. Keep it going tomorrow!"
+        : "Log a meal today to keep your streak.";
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _cardDecoration(),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                height: 44,
+                width: 44,
+                decoration: BoxDecoration(
+                  color: streakColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  Icons.whatshot_rounded,
+                  color: _streak > 0 ? streakColor : textSecondary,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "$_streak-day streak",
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: darkBlue,
+                      ),
+                    ),
+                    Text(
+                      message,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (final d in lastWeek)
+                Column(
+                  children: [
+                    Container(
+                      height: 26,
+                      width: 26,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _loggedDays.contains(_keyFor(d))
+                            ? streakColor
+                            : borderColor.withValues(alpha: 0.6),
+                      ),
+                      child: _loggedDays.contains(_keyFor(d))
+                          ? const Icon(
+                              Icons.check_rounded,
+                              size: 16,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _keyFor(d) == _keyFor(today)
+                          ? 'Today'
+                          : dayLetters[d.weekday - 1],
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: _keyFor(d) == _keyFor(today)
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                        color: textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
         ],
       ),
     );

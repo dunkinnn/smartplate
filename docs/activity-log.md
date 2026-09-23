@@ -144,3 +144,8 @@
 - Days Logged and the logging tip count only days up to today ("2 of 3").
 - Weekly trend labels today as "Today"; future days show as faint placeholder bars.
 - Not committed.
+
+## 2026-09-23 - Home logging streak
+
+- `dashboard.dart`: streak card under the greeting. Streak = consecutive days with at least one `food_logs` row, counted from today (or yesterday while today is not logged yet). Shows the signup-based week as dots (same as other calendars) and a short prompt. Reloads when Home is selected.
+- Not committed.
