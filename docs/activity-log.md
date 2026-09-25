@@ -366,3 +366,9 @@
 - New `screens/legal.dart`: the Terms and Privacy text (unchanged wording, moved from `signup.dart`) and a full-screen `LegalScreen`: header card with icon, title, effective date and intro; numbered sections; "Questions?" contact card; sticky "Accept" button.
 - `signup.dart`: the links open `LegalScreen` instead of a plain dialog; tapping Accept ticks the agreement checkbox.
 - Not committed.
+
+## 2026-09-25 - Offline banner and release internet permission
+
+- New `widgets/connection_banner.dart`: wraps the app (in `main.dart` builder) and shows a red "No internet connection. Check your Wi-Fi or mobile data." banner with Retry at the top of every screen while offline. Checks by resolving supabase.co every 15 s (every 4 s while offline) and when the app resumes.
+- `android/app/src/main/AndroidManifest.xml`: added the INTERNET permission. It was only in the debug and profile manifests, so release APKs could not reach Supabase or OpenAI.
+- Not committed.

@@ -5,6 +5,7 @@ import 'features/auth/screens/login.dart';
 import 'features/auth/screens/client/dashboard.dart';
 import 'features/auth/screens/splash.dart';
 import 'features/auth/services/alert_service.dart';
+import 'features/auth/widgets/connection_banner.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,7 +43,8 @@ class SmartPlateApp extends StatelessWidget {
               maxScaleFactor: 1.2,
             ),
           ),
-          child: child!,
+          // Shows "No internet connection" on every screen while offline.
+          child: ConnectionBanner(child: child!),
         );
       },
       // Animated intro, then Home or Login.
