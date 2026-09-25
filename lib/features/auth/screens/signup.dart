@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'login.dart';
 import 'profile.dart';
+import 'legal.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -10,75 +11,6 @@ class SignupScreen extends StatefulWidget {
   @override
   State<SignupScreen> createState() => _SignupScreenState();
 }
-
-// Condensed legal text for the in-app dialogs. Full versions live in
-// terms-of-service.md and privacy-policy.md. Fill in the age fields there
-// before publishing.
-const _termsOfServiceText = '''
-Smart Plate ("the Application") is operated by Jenalyn Pagauitan and Jemimah Jimenez (the "Service Provider"). By using the app you agree to these Terms.
-
-License
-The Application is distributed as open source software under its applicable license.
-
-Intellectual Property
-The Service Provider retains all rights in the app's code, design, and branding.
-
-Account and Age
-You must be legally permitted to use the app in your jurisdiction and meet the minimum age of digital consent. Below that age, a parent or guardian must accept these Terms on your behalf.
-
-User-Generated Content
-If you post content, it must not be illegal, infringing, abusive, spam, or misleading. The Service Provider may remove content or suspend accounts that violate these rules, and you may report content or appeal a moderation decision at smartplate@gmail.com.
-
-Third-Party Services
-The app uses Google Play Services.
-
-Limitation of Liability
-The Service Provider is not liable for indirect or consequential damages, except where liability cannot be excluded by law (e.g. negligence causing injury, fraud).
-
-Termination
-The Service Provider may suspend or terminate access for material breach, with notice and a cure period where applicable, or immediately for unlawful conduct.
-
-Governing Law
-These Terms are governed by the laws of the jurisdiction where the Service Provider is established.
-
-Changes
-The Service Provider may update these Terms and will post the new version here.
-
-Effective 2026-07-29. Full terms: terms-of-service.md. Contact: smartplate@gmail.com
-''';
-
-const _privacyPolicyText = '''
-This policy applies to the Smart Plate app, operated by Jenalyn Pagauitan and Jemimah Jimenez (the "Service Provider").
-
-Information Collected
-Device IP address, pages visited and time spent in the app, and your mobile operating system.
-
-How It's Used
-To operate and improve the app, send required notices, and, where permitted, marketing communications.
-
-Third-Party Sharing
-Only aggregated, anonymized data is shared with external services to improve the app. The app uses Google Play Services.
-
-International Transfers
-Data may be transferred outside your country of residence, using safeguards such as Standard Contractual Clauses where required.
-
-Your Rights
-You may request access to, correction of, or deletion of your data, and California residents have CCPA/CPRA rights, by contacting smartplate@gmail.com.
-
-Data Retention
-User-provided data is kept for the duration of your use plus 12 months; automatically collected data for up to 24 months; aggregated/anonymized data indefinitely, unless law requires otherwise.
-
-Children
-The app is not intended for children under the applicable minimum age, and data mistakenly collected from a child will be deleted.
-
-Security
-The Service Provider maintains physical, electronic, and procedural safeguards, and will notify you of any data breach as required by law.
-
-Changes
-The Service Provider may update this policy and will notify you of material changes.
-
-Effective 2026-07-29. Full policy: privacy-policy.md. Contact: smartplate@gmail.com
-''';
 
 class _SignupScreenState extends State<SignupScreen> {
   final fullNameController = TextEditingController();
@@ -239,21 +171,20 @@ class _SignupScreenState extends State<SignupScreen> {
     if (mounted) setState(() => isLoading = false);
   }
 
-  // Shows placeholder legal text in a dialog. Replace with real copy.
-  void _showLegalDialog(String title, String body) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: SingleChildScrollView(child: Text(body)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: brandGreen)),
-          ),
-        ],
+  // Opens the Terms or Privacy Policy; tapping Accept ticks the agreement box.
+  Future<void> _openLegal(String title, String text, IconData icon) async {
+    final accepted = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LegalScreen(title: title, text: text, icon: icon),
       ),
     );
+    if (accepted == true && mounted) {
+      setState(() {
+        agreedToTerms = true;
+        _termsError = null;
+      });
+    }
   }
 
   @override
@@ -492,7 +423,7 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // Checkbox row with tappable Terms/Privacy links that open placeholder dialogs.
+  // Checkbox row with tappable Terms/Privacy links that open the legal screens.
   Widget _buildTermsCheckbox() {
     final hasError = _termsError != null;
 
@@ -526,9 +457,10 @@ class _SignupScreenState extends State<SignupScreen> {
                     style: TextStyle(color: textGrey),
                   ),
                   GestureDetector(
-                    onTap: () => _showLegalDialog(
+                    onTap: () => _openLegal(
                       'Terms of Service',
-                      _termsOfServiceText,
+                      termsOfServiceText,
+                      Icons.gavel_rounded,
                     ),
                     child: const Text(
                       'Terms of Service',
@@ -540,8 +472,11 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const Text(' and ', style: TextStyle(color: textGrey)),
                   GestureDetector(
-                    onTap: () =>
-                        _showLegalDialog('Privacy Policy', _privacyPolicyText),
+                    onTap: () => _openLegal(
+                      'Privacy Policy',
+                      privacyPolicyText,
+                      Icons.shield_outlined,
+                    ),
                     child: const Text(
                       'Privacy Policy',
                       style: TextStyle(

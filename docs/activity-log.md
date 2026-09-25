@@ -360,3 +360,9 @@
 - `track.dart`, `grocery.dart`, `dashboard.dart`: meal plan queries add `saved_at is not null`, so Track's planned meals, the Grocery list and Home's Today's Meal Plan only show a plan once it is confirmed. Draft plans stay on Meal Plan only.
 - Empty-state text on Grocery and Home tells users to tap "Use this plan".
 - Not committed.
+
+## 2026-09-25 - Terms and Privacy Policy screens
+
+- New `screens/legal.dart`: the Terms and Privacy text (unchanged wording, moved from `signup.dart`) and a full-screen `LegalScreen`: header card with icon, title, effective date and intro; numbered sections; "Questions?" contact card; sticky "Accept" button.
+- `signup.dart`: the links open `LegalScreen` instead of a plain dialog; tapping Accept ticks the agreement checkbox.
+- Not committed.
