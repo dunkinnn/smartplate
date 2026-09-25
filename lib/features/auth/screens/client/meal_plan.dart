@@ -3,14 +3,21 @@ import 'package:smart_plate/features/auth/widgets/notification_bell.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/models/nutrients.dart';
 import 'package:smart_plate/features/auth/widgets/nutrient_guide_row.dart';
+import 'package:smart_plate/features/auth/widgets/meal_badge.dart';
 import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/services/calendar_days.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
+import 'package:smart_plate/features/auth/screens/client/plan_confirmed.dart';
 
 class MealPlanScreen extends StatefulWidget {
   final VoidCallback onBackToHome;
+  final VoidCallback? onOpenTrack;
 
-  const MealPlanScreen({super.key, required this.onBackToHome});
+  const MealPlanScreen({
+    super.key,
+    required this.onBackToHome,
+    this.onOpenTrack,
+  });
 
   @override
   State<MealPlanScreen> createState() => _MealPlanScreenState();
@@ -37,6 +44,9 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
   bool isSaving = false;
 
   bool get _isToday => _dateKey(selectedDate) == _dateKey(DateTime.now());
+
+  // Sugar, fiber and the rest stay folded until the user asks for them.
+  bool _showAllNutrients = false;
 
   bool get _isFuture =>
       _dateKey(selectedDate).compareTo(_dateKey(DateTime.now())) > 0;
@@ -193,7 +203,24 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           .select('id');
       if ((updated as List).isEmpty) throw Exception('Plan not updated');
 
-      if (mounted) setState(() => isSaved = true);
+      if (mounted) {
+        setState(() => isSaved = true);
+        // A confirmation screen replaces the old in-page banner.
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PlanConfirmedScreen(
+              totalKcal: totalKcal,
+              meals: [
+                for (final type in mealOrder)
+                  for (final item in itemsByMeal[type] ?? const [])
+                    (type, item['name'] as String? ?? ''),
+              ],
+              onOpenTrack: widget.onOpenTrack,
+            ),
+          ),
+        );
+      }
     } catch (e) {
       debugPrint('Failed to confirm meal plan: $e');
       if (mounted) setState(() => _message = 'Could not confirm your plan.');
@@ -237,13 +264,15 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                     _buildEmptyState()
                   else ...[
                     _buildCalorieSummary(),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 28),
+                    _buildSectionHeader(),
+                    const SizedBox(height: 12),
                     ...mealOrder
                         .where((type) => itemsByMeal.containsKey(type))
                         .map(
                           (type) => _buildMealCard(type, itemsByMeal[type]!),
                         ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     if (_isToday)
                       _buildPlanActions()
                     else
@@ -521,42 +550,10 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     );
   }
 
-  // Regenerate and Use this plan side by side, or a confirmed banner.
+  // Regenerate and Use this plan side by side; nothing once confirmed.
   Widget _buildPlanActions() {
-    if (isSaved) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: brandGreen.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: brandGreen.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          children: [
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.check_circle_rounded, color: brandGreen, size: 18),
-                SizedBox(width: 8),
-                Text(
-                  "Plan confirmed",
-                  style: TextStyle(
-                    color: brandGreen,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              "Mark meals as eaten in Track.",
-              style: const TextStyle(color: textSecondary, fontSize: 12),
-            ),
-          ],
-        ),
-      );
-    }
+    // Confirmed plans need no buttons; the calendar dot shows the status.
+    if (isSaved) return const SizedBox.shrink();
 
     return Row(
       children: [
@@ -636,62 +633,156 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     );
   }
 
+  // One card: planned total, goal check and macros, with other nutrients folded.
   Widget _buildCalorieSummary() {
     final mealCount = itemsByMeal.values.fold(0, (s, l) => s + l.length);
+    final target = (_goals['calorie_target'] as num?)?.round();
+    final fitsGoal =
+        target != null && (totalKcal - target).abs() <= target * 0.1;
 
-    return Column(
-      children: [
-        const Text(
-          "Planned Total",
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: textSecondary,
-            letterSpacing: 0.5,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "PLANNED TOTAL",
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: textSecondary,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: _formatNumber(totalKcal),
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: darkBlue,
+                              letterSpacing: -1,
+                            ),
+                          ),
+                          const TextSpan(
+                            text: " kcal",
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      "$mealCount meals · AI generated",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (target != null) _buildGoalPill(target, fitsGoal),
+            ],
           ),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              _formatNumber(totalKcal),
-              style: const TextStyle(
-                fontSize: 42,
-                fontWeight: FontWeight.w900,
-                color: darkBlue,
-                letterSpacing: -1,
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              _buildMacroStat("Protein", 'protein_g', 'protein_goal_g', brandGreen),
+              const SizedBox(width: 12),
+              _buildMacroStat("Carbs", 'carbs_g', 'carbs_goal_g', darkBlue),
+              const SizedBox(width: 12),
+              _buildMacroStat(
+                "Fat",
+                'fat_g',
+                'fat_goal_g',
+                const Color(0xFFFB4B93),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: () => setState(() => _showAllNutrients = !_showAllNutrients),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Text(
+                    _showAllNutrients ? "Hide nutrients" : "See all nutrients",
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: brandGreen,
+                    ),
+                  ),
+                  Icon(
+                    _showAllNutrients
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: brandGreen,
+                    size: 20,
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 6),
-            const Text(
-              "kcal",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: textSecondary,
-              ),
-            ),
+          ),
+          if (_showAllNutrients) ...[
+            const SizedBox(height: 4),
+            for (final n in Nutrient.all)
+              NutrientGuideRow(nutrient: n, value: _sumOf(n.column)),
           ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildSummaryChip(Icons.restaurant_rounded, "$mealCount Meals"),
-            const SizedBox(width: 12),
-            _buildSummaryChip(
-              Icons.auto_awesome_rounded,
-              "AI Generated",
-              color: brandGreen,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGoalPill(int target, bool fitsGoal) {
+    final color = fitsGoal ? brandGreen : textSecondary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            fitsGoal ? Icons.check_circle_rounded : Icons.flag_outlined,
+            size: 14,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            fitsGoal ? "Fits goal" : "Goal ${_formatNumber(target)}",
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: color,
             ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        _buildMacroCard(),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -699,129 +790,71 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
       .expand((l) => l)
       .fold(0.0, (s, i) => s + ((i[key] as num?)?.toDouble() ?? 0));
 
-  // Planned calories and macros against the user's goals.
-  Widget _buildMacroCard() {
-    final target = (_goals['calorie_target'] as num?)?.round();
-    final fitsGoal =
-        target != null && (totalKcal - target).abs() <= target * 0.1;
+  // Grams planned for one macro, with a thin bar against the user's goal.
+  Widget _buildMacroStat(String label, String key, String goalKey, Color color) {
+    final value = _sumOf(key);
+    final goal = (_goals[goalKey] as num?)?.toDouble();
+    final progress = goal != null && goal > 0
+        ? (value / goal).clamp(0.0, 1.0)
+        : 0.0;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(20),
-      ),
+    return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (target != null)
-            Row(
-              children: [
-                Icon(
-                  fitsGoal
-                      ? Icons.check_circle_rounded
-                      : Icons.info_outline_rounded,
-                  color: fitsGoal ? brandGreen : textSecondary,
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    fitsGoal
-                        ? "Fits your ${_formatNumber(target)} kcal daily goal"
-                        : "Your daily goal is ${_formatNumber(target)} kcal",
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: fitsGoal ? brandGreen : textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          const SizedBox(height: 14),
-          _buildMacroRow(
-            "Protein",
-            _sumOf('protein_g'),
-            _goals['protein_goal_g'],
-            brandGreen,
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: textSecondary),
           ),
-          _buildMacroRow(
-            "Carbs",
-            _sumOf('carbs_g'),
-            _goals['carbs_goal_g'],
-            darkBlue,
-          ),
-          _buildMacroRow(
-            "Fat",
-            _sumOf('fat_g'),
-            _goals['fat_goal_g'],
-            const Color(0xFFFB4B93),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            "OTHER NUTRIENTS (DAILY GUIDE)",
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: textSecondary,
-              letterSpacing: 1.2,
+          const SizedBox(height: 2),
+          Text(
+            "${value.round()} g",
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: darkBlue,
             ),
           ),
-          const SizedBox(height: 10),
-          for (final n in Nutrient.all)
-            NutrientGuideRow(nutrient: n, value: _sumOf(n.column)),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 5,
+              color: color,
+              backgroundColor: borderColor,
+            ),
+          ),
+          if (goal != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              "of ${goal.round()} g",
+              style: const TextStyle(fontSize: 11, color: textSecondary),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildMacroRow(String label, double value, Object? goal, Color color) {
-    final goalValue = (goal as num?)?.toDouble();
-    final progress = goalValue != null && goalValue > 0
-        ? (value / goalValue).clamp(0.0, 1.0)
-        : 0.0;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: textMain,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                goalValue != null
-                    ? "${value.round()} / ${goalValue.round()} g"
-                    : "${value.round()} g",
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: textSecondary,
-                ),
-              ),
-            ],
+  Widget _buildSectionHeader() {
+    return const Row(
+      children: [
+        Text(
+          "MEALS",
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: textSecondary,
+            letterSpacing: 1.2,
           ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 6,
-              color: color,
-              backgroundColor: const Color(0xFFE2E8F0),
-            ),
-          ),
-        ],
-      ),
+        ),
+        Spacer(),
+        Text(
+          "Tap a dish for details",
+          style: TextStyle(fontSize: 12, color: textSecondary),
+        ),
+      ],
     );
   }
 
@@ -1033,169 +1066,79 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     (m) => '${m[1]},',
   );
 
-  Widget _buildSummaryChip(
-    IconData icon,
-    String label, {
-    Color color = textSecondary,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: color == brandGreen
-            ? color.withValues(alpha: 0.05)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
+  // Meal type header with the same icon tile as Home, then its dishes.
   Widget _buildMealCard(String title, List<Map<String, dynamic>> items) {
     final mealKcal = items.fold(
       0,
       (sum, i) => sum + ((i['kcal'] as num?)?.round() ?? 0),
     );
-    IconData mealIcon;
-    Color iconColor;
-
-    switch (title.toLowerCase()) {
-      case 'breakfast':
-        mealIcon = Icons.wb_sunny_outlined;
-        iconColor = Colors.orange.shade600;
-        break;
-      case 'lunch':
-        mealIcon = Icons.restaurant_rounded;
-        iconColor = brandGreen;
-        break;
-      case 'dinner':
-        mealIcon = Icons.nights_stay_outlined;
-        iconColor = darkBlue;
-        break;
-      default:
-        mealIcon = Icons.fastfood_outlined;
-        iconColor = Colors.grey;
-    }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 8, 6),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: borderColor, width: 1), // 1px Border
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor),
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: 64,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.05),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(23), // Adjusted for border alignment
-                  bottomLeft: Radius.circular(23),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              MealBadge(mealType: title, size: 36),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: darkBlue,
+                  ),
                 ),
-                border: Border(right: BorderSide(color: borderColor, width: 1)),
               ),
-              child: Icon(mealIcon, color: iconColor, size: 26),
-            ),
-            Expanded(
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Text(
+                  "$mealKcal kcal",
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          for (final item in items)
+            InkWell(
+              onTap: () => _showDishDetails(title, item),
+              borderRadius: BorderRadius.circular(12),
               child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                padding: const EdgeInsets.fromLTRB(48, 8, 0, 8),
+                child: Row(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
-                            color: darkBlue,
-                          ),
-                        ),
-                        Text(
-                          "$mealKcal kcal",
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    ...items.map(
-                      (item) => InkWell(
-                        onTap: () => _showDishDetails(title, item),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 5,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                  color: iconColor.withValues(alpha: 0.5),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  item['name'] as String? ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: textMain,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                "${(item['kcal'] as num?)?.round() ?? 0} kcal",
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: darkBlue,
-                                ),
-                              ),
-                              const Icon(
-                                Icons.chevron_right_rounded,
-                                color: textSecondary,
-                                size: 20,
-                              ),
-                            ],
-                          ),
+                    Expanded(
+                      child: Text(
+                        item['name'] as String? ?? '',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: textMain,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    const Text(
-                      "Tap a dish for ingredients and nutrition",
-                      style: TextStyle(fontSize: 11, color: textSecondary),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: textSecondary,
+                      size: 20,
                     ),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }

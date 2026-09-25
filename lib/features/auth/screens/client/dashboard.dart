@@ -258,6 +258,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       MealPlanScreen(
         key: ValueKey('meal-plan-$_refreshTick'),
         onBackToHome: () => _selectTab(0),
+        onOpenTrack: () => _selectTab(3),
       ),
       GroceryScreen(
         key: ValueKey('grocery-$_refreshTick'),

@@ -287,3 +287,24 @@
 - `drawable-v21/launch_background.xml`: plain white background.
 - New `values-v31/styles.xml`, `values-night-v31/styles.xml` and `drawable/splash_transparent.xml`: Android 12+ system splash is white with an empty icon, so only the animated Flutter intro shows the logo.
 - Not committed.
+
+## 2026-09-25 - Cleaner Meal Plan layout
+
+- `meal_plan.dart` (calendar and legend unchanged): Planned Total, the "3 meals / AI generated" chips and the macro card merged into one summary card with a goal pill and three compact macro stats; sugar, fiber and the other nutrients fold under "See all nutrients".
+- A single "MEALS / Tap a dish for details" header replaces the hint repeated in every card.
+- Meal cards use the Home meal icon tile (`MealBadge`), meal total on the right and one row per dish with a chevron, instead of the tinted side strip.
+- Not committed.
+
+## 2026-09-25 - Cleaner Track layout
+
+- `track.dart` (calendar unchanged): calorie card keeps the ring and Remaining, with the status and streak pills in one row and a new bottom strip "N of M planned meals eaten" with one segment per meal.
+- Nutrients card: protein, carbs and fat against profile goals; sugar, fiber and the rest fold under "See all nutrients".
+- Meal cards: planned dish in a soft row with a clear "Ate" button (becomes a green "Eaten" button; past days show Eaten/Not eaten, future days Planned). Hand-logged foods listed below with delete; the full-width "Log Item" button is now a small "Add food" link. Section header renamed "MEALS".
+- Not committed.
+
+## 2026-09-25 - Plan confirmation screen
+
+- New `client/plan_confirmed.dart`: full-screen confirmation after "Use this plan" (animated check, "Plan confirmed!", meal count and calories, each meal with its icon, "Go to Track" and "Back to Meal Plan").
+- `meal_plan.dart`: the in-page "Plan confirmed" card is removed; confirmed plans show no action buttons. New optional `onOpenTrack`, passed from `dashboard.dart`.
+- `track.dart`: lint fix, null-aware element `?planned`.
+- Not committed.

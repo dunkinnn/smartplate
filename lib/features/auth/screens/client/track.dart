@@ -32,7 +32,11 @@ class _TrackScreenState extends State<TrackScreen> {
   DateTime selectedDate = DateTime.now();
   Map<String, List<FoodEntry>> logsByMeal = {};
   int? calorieTarget;
+  Map<String, dynamic> _macroGoals = {};
   bool isLoading = true;
+
+  // Sugar, fiber and the rest stay folded until the user asks for them.
+  bool _showAllNutrients = false;
 
   // The day's generated plan by meal type, shown until the meal is eaten.
   Map<String, List<FoodEntry>> planByMeal = {};
@@ -81,7 +85,7 @@ class _TrackScreenState extends State<TrackScreen> {
 
       final profile = await supabase
           .from('user_profiles')
-          .select('calorie_target')
+          .select('calorie_target, protein_goal_g, carbs_goal_g, fat_goal_g')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -119,6 +123,7 @@ class _TrackScreenState extends State<TrackScreen> {
         logsByMeal = grouped;
         planByMeal = planned;
         calorieTarget = (profile?['calorie_target'] as num?)?.round();
+        _macroGoals = profile ?? {};
         isLoading = false;
       });
     } catch (e) {
@@ -248,13 +253,13 @@ class _TrackScreenState extends State<TrackScreen> {
                   _buildHorizontalCalendar(),
                   const SizedBox(height: 25),
                   _buildCalorieProgressCard(),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   if (!_isFuture) ...[
                     _buildNutrientsCard(),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 28),
                   ],
 
-                  _buildSectionHeader("DAILY LOGS"),
+                  _buildSectionHeader("MEALS"),
                   if (isLoading)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 40),
@@ -392,7 +397,9 @@ class _TrackScreenState extends State<TrackScreen> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        children: [
+          Row(
         children: [
           Stack(
             alignment: Alignment.center,
@@ -450,10 +457,14 @@ class _TrackScreenState extends State<TrackScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
-                    vertical: 4,
+                    vertical: 6,
                   ),
                   decoration: BoxDecoration(
                     color: (isOver ? const Color(0xFFF25151) : brandGreen)
@@ -474,28 +485,68 @@ class _TrackScreenState extends State<TrackScreen> {
                     ),
                   ),
                 ),
-                if (_streak > 0) ...[
-                  const SizedBox(height: 10),
-                  StreakPill(days: _streak, onDark: true),
-                ],
-                if (planByMeal.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    "Plan ${_formatNumber(_plannedKcal)} kcal · "
-                    "${planByMeal.keys.where(_isPlanEaten).length} of "
-                    "${planByMeal.length} meals eaten",
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+                    if (_streak > 0) StreakPill(days: _streak, onDark: true),
+                  ],
+                ),
               ],
             ),
           ),
         ],
+          ),
+          if (planByMeal.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            _buildPlanProgress(),
+          ],
+        ],
       ),
+    );
+  }
+
+  // How many planned meals are eaten, as one segment per meal.
+  Widget _buildPlanProgress() {
+    final meals = mealTypes.where(planByMeal.containsKey).toList();
+    final eaten = meals.where(_isPlanEaten).length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              "$eaten of ${meals.length} planned meals eaten",
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              "Plan ${_formatNumber(_plannedKcal)} kcal",
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            for (var i = 0; i < meals.length; i++) ...[
+              Expanded(
+                child: Container(
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: _isPlanEaten(meals[i])
+                        ? brandGreen
+                        : Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              if (i < meals.length - 1) const SizedBox(width: 6),
+            ],
+          ],
+        ),
+      ],
     );
   }
 
@@ -504,30 +555,54 @@ class _TrackScreenState extends State<TrackScreen> {
     (m) => '${m[1]},',
   );
 
-  // Everything eaten on the selected day beyond calories.
+  // Macros against goals, with sugar, fiber and the rest folded underneath.
   Widget _buildNutrientsCard() {
-    Widget macro(String label, double grams) => Expanded(
-      child: Column(
-        children: [
-          Text(
-            "${grams.round()} g",
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-              color: darkBlue,
+    Widget macro(String label, double grams, String goalKey, Color color) {
+      final goal = (_macroGoals[goalKey] as num?)?.toDouble();
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: textSecondary),
             ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 11, color: textSecondary),
-          ),
-        ],
-      ),
-    );
+            const SizedBox(height: 2),
+            Text(
+              "${grams.round()} g",
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: darkBlue,
+              ),
+            ),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: goal != null && goal > 0
+                    ? (grams / goal).clamp(0.0, 1.0)
+                    : 0,
+                minHeight: 5,
+                color: color,
+                backgroundColor: borderColor,
+              ),
+            ),
+            if (goal != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                "of ${goal.round()} g",
+                style: const TextStyle(fontSize: 11, color: textSecondary),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
       decoration: BoxDecoration(
         color: bgLight,
         borderRadius: BorderRadius.circular(20),
@@ -536,17 +611,49 @@ class _TrackScreenState extends State<TrackScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader("NUTRIENTS"),
           Row(
             children: [
-              macro("Protein", _total((f) => f.proteinG)),
-              macro("Carbs", _total((f) => f.carbsG)),
-              macro("Fat", _total((f) => f.fatG)),
+              macro("Protein", _total((f) => f.proteinG), 'protein_goal_g', brandGreen),
+              const SizedBox(width: 12),
+              macro("Carbs", _total((f) => f.carbsG), 'carbs_goal_g', darkBlue),
+              const SizedBox(width: 12),
+              macro(
+                "Fat",
+                _total((f) => f.fatG),
+                'fat_goal_g',
+                const Color(0xFFFB4B93),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          for (final e in _nutrientOf.entries)
-            NutrientGuideRow(nutrient: e.key, value: _total(e.value)),
+          InkWell(
+            onTap: () => setState(() => _showAllNutrients = !_showAllNutrients),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  Text(
+                    _showAllNutrients ? "Hide nutrients" : "See all nutrients",
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: brandGreen,
+                    ),
+                  ),
+                  Icon(
+                    _showAllNutrients
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: brandGreen,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_showAllNutrients)
+            for (final e in _nutrientOf.entries)
+              NutrientGuideRow(nutrient: e.key, value: _total(e.value)),
         ],
       ),
     );
@@ -568,126 +675,149 @@ class _TrackScreenState extends State<TrackScreen> {
     );
   }
 
-  // Planned dish with an eaten check; shows the logged rows once eaten.
-  List<Widget> _buildPlannedRows(String mealType, List<FoodEntry> items) {
+  // Planned dish with an Ate button; once eaten it shows the logged rows.
+  Widget? _buildPlannedRow(String mealType, List<FoodEntry> items) {
     final eaten = items.where((f) => f.source == 'plan').toList();
     final dishes = eaten.isNotEmpty
         ? eaten
         : planByMeal[mealType] ?? const <FoodEntry>[];
-    if (dishes.isEmpty) return const [];
+    if (dishes.isEmpty) return null;
 
     final isEaten = eaten.isNotEmpty;
     final busy = _togglingMeal == mealType;
-    final label = isEaten
-        ? "FROM YOUR PLAN · EATEN"
-        : _isFuture
-        ? "PLANNED"
-        : _isToday
-        ? "PLANNED · TAP IF EATEN"
-        : "PLANNED · NOT EATEN";
 
-    return [
-      InkWell(
-        onTap: busy || !_isToday ? null : () => _togglePlanned(mealType),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          margin: const EdgeInsets.only(bottom: 4),
-          decoration: BoxDecoration(
-            color: isEaten ? brandGreen.withValues(alpha: 0.08) : bgLight,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              busy
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: brandGreen,
-                      ),
-                    )
-                  : Icon(
-                      isEaten
-                          ? Icons.check_circle_rounded
-                          : _isFuture
-                          ? Icons.schedule_rounded
-                          : Icons.radio_button_unchecked_rounded,
-                      color: isEaten ? brandGreen : textSecondary,
-                      size: 20,
-                    ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                        color: isEaten ? brandGreen : textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    ...dishes.map(
-                      (d) => Text(
-                        d.name,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: darkBlue,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
+    Widget action;
+    if (_isToday) {
+      action = SizedBox(
+        height: 34,
+        child: busy
+            ? const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 18),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: brandGreen,
+                  ),
                 ),
-              ),
-              Text(
-                "${dishes.fold(0, (s, d) => s + d.kcal)} kcal",
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: textSecondary,
-                  fontWeight: FontWeight.w600,
+              )
+            : isEaten
+            ? FilledButton.icon(
+                onPressed: () => _togglePlanned(mealType),
+                icon: const Icon(Icons.check_rounded, size: 16),
+                label: const Text("Eaten"),
+                style: FilledButton.styleFrom(
+                  backgroundColor: brandGreen,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
+              )
+            : OutlinedButton(
+                onPressed: () => _togglePlanned(mealType),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: brandGreen,
+                  side: const BorderSide(color: brandGreen),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                child: const Text("Ate"),
               ),
-            ],
-          ),
+      );
+    } else {
+      action = Text(
+        isEaten
+            ? "Eaten"
+            : _isFuture
+            ? "Planned"
+            : "Not eaten",
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: isEaten ? brandGreen : textSecondary,
         ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+      decoration: BoxDecoration(
+        color: isEaten ? brandGreen.withValues(alpha: 0.08) : bgLight,
+        borderRadius: BorderRadius.circular(14),
       ),
-    ];
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "FROM YOUR PLAN",
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    color: textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                for (final d in dishes)
+                  Text(
+                    "${d.name} · ${d.kcal} kcal",
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: darkBlue,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          action,
+        ],
+      ),
+    );
   }
 
   Widget _buildTrackMealCard(String title, List<FoodEntry> items) {
+    final planned = _buildPlannedRow(title, items);
+    final extras = items.where((f) => f.source != 'plan').toList();
+    final kcal = items.fold(0, (s, f) => s + f.kcal);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              MealBadge(mealType: title),
+              MealBadge(mealType: title, size: 36),
               const SizedBox(width: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: darkBlue,
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: darkBlue,
+                  ),
                 ),
               ),
-              const Spacer(),
               Text(
-                items.isEmpty
-                    ? "—"
-                    : "${items.fold(0, (s, f) => s + f.kcal)} kcal",
+                kcal == 0 ? "—" : "$kcal kcal",
                 style: const TextStyle(
                   fontSize: 13,
                   color: textSecondary,
@@ -697,93 +827,73 @@ class _TrackScreenState extends State<TrackScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          ..._buildPlannedRows(title, items),
-          if (items.isEmpty && (planByMeal[title] ?? const []).isEmpty)
+          ?planned,
+          // Foods added with Add food, listed under the planned dish.
+          for (final item in extras)
+            Padding(
+              padding: const EdgeInsets.only(left: 4, top: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.quantity.isEmpty
+                          ? item.name
+                          : "${item.name} (${item.quantity})",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: darkBlue,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    "${item.kcal} kcal",
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  // Hand-logged foods can be removed on the same day only.
+                  if (_isToday && item.id != null)
+                    IconButton(
+                      tooltip: 'Remove',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _confirmDelete(item),
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: textSecondary,
+                        size: 20,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          if (planned == null && extras.isEmpty)
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
+              padding: EdgeInsets.only(left: 4, bottom: 6),
               child: Text(
-                "Nothing logged yet",
-                style: TextStyle(
+                "Nothing logged",
+                style: TextStyle(fontSize: 13, color: textSecondary),
+              ),
+            ),
+          // Extra foods can only be logged for today.
+          if (_isToday)
+            TextButton.icon(
+              onPressed: () => _openLogMeal(title),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text("Add food"),
+              style: TextButton.styleFrom(
+                foregroundColor: brandGreen,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                textStyle: const TextStyle(
                   fontSize: 13,
-                  color: textSecondary,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             )
           else
-            ...items
-                .where((f) => f.source != 'plan')
-                .map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.quantity.isEmpty
-                                ? item.name
-                                : "${item.name} (${item.quantity})",
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: darkBlue,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          "${item.kcal} kcal",
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        // Hand-logged foods can be removed on the same day only.
-                        if (_isToday && item.id != null)
-                          IconButton(
-                            tooltip: 'Remove',
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () => _confirmDelete(item),
-                            icon: const Icon(
-                              Icons.delete_outline_rounded,
-                              color: textSecondary,
-                              size: 20,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-          // Extra foods can only be logged for today.
-          if (_isToday) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: TextButton.icon(
-                onPressed: () => _openLogMeal(title),
-                icon: const Icon(
-                  Icons.add_rounded,
-                  color: brandGreen,
-                  size: 18,
-                ),
-                label: const Text(
-                  "Log Item",
-                  style: TextStyle(
-                    color: brandGreen,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                style: TextButton.styleFrom(
-                  backgroundColor: bgLight,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ],
+            const SizedBox(height: 6),
         ],
       ),
     );
