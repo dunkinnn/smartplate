@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_plate/features/auth/widgets/onboarding_progress.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/screens/preferences.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -27,6 +28,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   File? avatarFile;
 
   final List<String> genderOptions = ['Male', 'Female', 'Other'];
+
+  // True when the name typed at sign-up is available, so it is not asked again.
+  bool _hasSignupName = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final name = Supabase.instance.client.auth.currentUser
+        ?.userMetadata?['full_name']
+        ?.toString()
+        .trim();
+    if (name != null && name.isNotEmpty) {
+      fullNameController.text = name;
+      _hasSignupName = true;
+    }
+  }
 
   @override
   void dispose() {
@@ -149,11 +166,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Center(child: _buildAvatarPicker()),
             const SizedBox(height: 30),
 
-            _buildLabel('FULL NAME'),
-            _buildTextField(
-              hint: 'Enter your full name',
-              controller: fullNameController,
-            ),
+            // Name comes from sign-up; the field only shows if it is missing.
+            if (_hasSignupName)
+              Center(
+                child: Text(
+                  "Hi, ${fullNameController.text.split(' ').first}! Let's set up your profile.",
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              )
+            else ...[
+              _buildLabel('FULL NAME'),
+              _buildTextField(
+                hint: 'Enter your full name',
+                controller: fullNameController,
+              ),
+            ],
 
             const SizedBox(height: 20),
             Row(

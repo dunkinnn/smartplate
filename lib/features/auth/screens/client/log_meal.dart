@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:smart_plate/features/auth/widgets/notification_bell.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/alert_service.dart';
 import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/models/food_entry.dart';
 import 'package:smart_plate/features/auth/screens/client/custom_food.dart';
@@ -168,6 +169,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
                 .toList(),
           );
 
+      AlertService.update();
       if (mounted) Navigator.pop(context, true);
     } on PostgrestException catch (e) {
       if (mounted) _showMessage(friendlyError(e));

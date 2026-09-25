@@ -56,6 +56,7 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
         'taste': widget.allData['taste'],
         'allergen': widget.allData['allergen'],
         'food_restriction': widget.allData['food_restriction'],
+        'nutrition_focus': widget.allData['nutrition_focus'],
         'calorie_target': widget.allData['calorie_target'],
         'weight_goal': widget.allData['weight_goal'],
         'target_weight': widget.allData['target_weight'],
@@ -178,6 +179,7 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
               children: [
                 _buildReviewRow('Diet', _fmt(d['diet'])),
                 _buildReviewRow('Taste', _fmt(d['taste'])),
+                _buildReviewRow('Nutrition Focus', _fmt(d['nutrition_focus'])),
                 _buildReviewRow('Allergens', _fmt(d['allergen'])),
                 _buildReviewRow('Avoid', _fmt(d['food_restriction'])),
               ],

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:smart_plate/features/auth/widgets/notification_bell.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/models/nutrients.dart';
+import 'package:smart_plate/features/auth/widgets/nutrient_guide_row.dart';
 import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/services/calendar_days.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
@@ -249,6 +251,8 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                         "Past plan, view only.",
                         style: TextStyle(fontSize: 12, color: textSecondary),
                       ),
+                    const SizedBox(height: 16),
+                    _buildAllergyNote(),
                   ],
 
                   const SizedBox(height: 40),
@@ -486,6 +490,34 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  // Plans are checked against allergies, but hidden ingredients cannot be.
+  Widget _buildAllergyNote() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFED7AA)),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, color: Colors.orange, size: 18),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              "Always check ingredients and labels if you have a severe allergy. "
+              "Plans are checked against your allergies, but store-bought "
+              "sauces and mixes can contain hidden ingredients.",
+              style: TextStyle(fontSize: 12, color: textMain, height: 1.4),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -727,6 +759,19 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
             _goals['fat_goal_g'],
             const Color(0xFFFB4B93),
           ),
+          const SizedBox(height: 8),
+          const Text(
+            "OTHER NUTRIENTS (DAILY GUIDE)",
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: textSecondary,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 10),
+          for (final n in Nutrient.all)
+            NutrientGuideRow(nutrient: n, value: _sumOf(n.column)),
         ],
       ),
     );
@@ -865,6 +910,28 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                 _buildNutrientTile("Fat", item['fat_g'], unit: 'g'),
               ],
             ),
+            const SizedBox(height: 16),
+            for (final n in Nutrient.all)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Text(
+                      n.label,
+                      style: const TextStyle(fontSize: 13, color: textMain),
+                    ),
+                    const Spacer(),
+                    Text(
+                      n.format((item[n.column] as num?)?.toDouble() ?? 0),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: darkBlue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             if (hasAllergen) ...[
               const SizedBox(height: 16),
               Container(
@@ -895,6 +962,8 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 12),
+            _buildAllergyNote(),
             const SizedBox(height: 24),
             const Text(
               "INGREDIENTS",

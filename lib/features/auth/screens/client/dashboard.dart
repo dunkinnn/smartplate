@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:smart_plate/features/auth/widgets/notification_bell.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/alert_service.dart';
 import 'package:smart_plate/features/auth/services/calendar_days.dart';
 import 'package:smart_plate/features/auth/screens/client/grocery.dart';
 import 'package:smart_plate/features/auth/screens/client/insight.dart';
@@ -55,6 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadTodayLogs();
     _loadTodayPlan();
     _loadStreak();
+    AlertService.update();
   }
 
   String _keyFor(DateTime d) =>
@@ -245,6 +247,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _loadTodayLogs();
       _loadTodayPlan();
       _loadStreak();
+      AlertService.update();
     }
   }
 

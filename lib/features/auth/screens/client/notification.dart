@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/models/nutrients.dart';
 import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
@@ -39,7 +40,9 @@ Future<int> unreadNotificationCount() async {
 
   final logs = await supabase
       .from('food_logs')
-      .select('meal_type, kcal, protein_g, created_at')
+      .select(
+        'meal_type, kcal, protein_g, sugar_g, saturated_fat_g, sodium_mg, cholesterol_mg, created_at',
+      )
       .eq('user_id', user.id)
       .eq('logged_date', today);
   final profile = await supabase
@@ -116,7 +119,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
     try {
       final logs = await supabase
           .from('food_logs')
-          .select('meal_type, kcal, protein_g, created_at')
+          .select(
+            'meal_type, kcal, protein_g, sugar_g, saturated_fat_g, sodium_mg, cholesterol_mg, created_at',
+          )
           .eq('user_id', user.id)
           .eq('logged_date', _todayKey)
           .timeout(const Duration(seconds: 10));
@@ -237,6 +242,27 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
 
     // Meal reminders, once the usual window for that meal has passed.
+    // Limits from the daily nutrient guide, e.g. sugar over 50 g.
+    for (final n in Nutrient.all.where((n) => n.isLimit)) {
+      final total = logs.fold<double>(
+        0,
+        (sum, r) => sum + (((r as Map)[n.column] as num?)?.toDouble() ?? 0),
+      );
+      if (total > n.dailyGuide) {
+        result.add(
+          AppNotification(
+            id: 'limit_${n.column}',
+            title: "${n.label} Above Daily Guide",
+            description:
+                "Today's logs show ${n.format(total)} against a ${n.format(n.dailyGuide)} guide.",
+            time: lastLogTime,
+            icon: Icons.warning_amber_rounded,
+            iconColor: Colors.orange,
+          ),
+        );
+      }
+    }
+
     const windows = {'Breakfast': 10, 'Lunch': 14, 'Dinner': 21};
     windows.forEach((meal, hour) {
       if (now.hour >= hour && !loggedMeals.contains(meal)) {

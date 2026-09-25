@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/services/meal_log_service.dart';
+import 'package:smart_plate/features/auth/widgets/preference_chips.dart';
 import 'package:smart_plate/features/auth/widgets/settings_form.dart';
 
 // Edits the diet, taste, allergen and restriction fields the meal plan
@@ -15,27 +16,11 @@ class DietaryPreferencesScreen extends StatefulWidget {
 }
 
 class _DietaryPreferencesScreenState extends State<DietaryPreferencesScreen> {
-  static const dietOptions = ['Vegan', 'Keto', 'Paleo', 'Vegetarian', 'None'];
-  static const tasteOptions = ['Sweet', 'Spicy', 'Salty', 'Bitter', 'Savory'];
-  static const allergenOptions = [
-    'None',
-    'Peanuts',
-    'Dairy',
-    'Gluten',
-    'Shellfish',
-  ];
-  static const restrictionOptions = [
-    'None',
-    'Pork',
-    'Beef',
-    'Alcohol',
-    'Processed Sugar',
-  ];
-
   String? _diet;
-  String? _taste;
-  String? _allergen;
-  String? _restriction;
+  Set<String> _tastes = {};
+  Set<String> _allergens = {};
+  Set<String> _restrictions = {};
+  Set<String> _nutritionFocus = {};
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -56,7 +41,7 @@ class _DietaryPreferencesScreenState extends State<DietaryPreferencesScreen> {
     try {
       final row = await supabase
           .from('user_profiles')
-          .select('diet, taste, allergen, food_restriction')
+          .select('diet, taste, allergen, food_restriction, nutrition_focus')
           .eq('id', user.id)
           .maybeSingle()
           .timeout(const Duration(seconds: 10));
@@ -64,9 +49,14 @@ class _DietaryPreferencesScreenState extends State<DietaryPreferencesScreen> {
       if (!mounted) return;
       setState(() {
         _diet = row?['diet'] as String?;
-        _taste = row?['taste'] as String?;
-        _allergen = row?['allergen'] as String?;
-        _restriction = row?['food_restriction'] as String?;
+        _tastes = PreferenceOptions.split(row?['taste'] as String?);
+        _allergens = PreferenceOptions.split(row?['allergen'] as String?);
+        _restrictions = PreferenceOptions.split(
+          row?['food_restriction'] as String?,
+        );
+        _nutritionFocus = PreferenceOptions.split(
+          row?['nutrition_focus'] as String?,
+        );
         _isLoading = false;
       });
     } catch (e) {
@@ -92,9 +82,10 @@ class _DietaryPreferencesScreenState extends State<DietaryPreferencesScreen> {
           .from('user_profiles')
           .update({
             'diet': _diet,
-            'taste': _taste,
-            'allergen': _allergen,
-            'food_restriction': _restriction,
+            'taste': PreferenceOptions.join(_tastes),
+            'allergen': PreferenceOptions.join(_allergens),
+            'food_restriction': PreferenceOptions.join(_restrictions),
+            'nutrition_focus': PreferenceOptions.join(_nutritionFocus),
             'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', user.id);
@@ -144,26 +135,36 @@ class _DietaryPreferencesScreenState extends State<DietaryPreferencesScreen> {
         SettingsDropdown(
           hint: 'Select your diet type',
           value: _diet,
-          items: dietOptions,
+          items: PreferenceOptions.diets,
           onChanged: (v) => setState(() => _diet = v),
         ),
         const SizedBox(height: 20),
 
-        const SettingsLabel('TASTE PREFERENCE'),
-        SettingsDropdown(
-          hint: 'Select your preferred taste',
-          value: _taste,
-          items: tasteOptions,
-          onChanged: (v) => setState(() => _taste = v),
+        const SettingsLabel('TASTE PREFERENCES (PICK ANY)'),
+        PreferenceChips(
+          options: PreferenceOptions.tastes,
+          allowCustom: true,
+          customHint: 'e.g. Garlicky, Tangy',
+          selected: _tastes,
+          onChanged: (v) => setState(() => _tastes = v),
         ),
         const SizedBox(height: 20),
 
-        const SettingsLabel('ALLERGENS'),
-        SettingsDropdown(
-          hint: 'Select allergens you have',
-          value: _allergen,
-          items: allergenOptions,
-          onChanged: (v) => setState(() => _allergen = v),
+        const SettingsLabel('NUTRITION FOCUS (PICK ANY)'),
+        PreferenceChips(
+          options: PreferenceOptions.nutritionFocus,
+          selected: _nutritionFocus,
+          onChanged: (v) => setState(() => _nutritionFocus = v),
+        ),
+        const SizedBox(height: 20),
+
+        const SettingsLabel('ALLERGENS (PICK ALL THAT APPLY)'),
+        PreferenceChips(
+          options: PreferenceOptions.allergens,
+          allowCustom: true,
+          customHint: 'e.g. Kiwi, Tomato',
+          selected: _allergens,
+          onChanged: (v) => setState(() => _allergens = v),
         ),
         const SizedBox(height: 8),
         const Text(
@@ -177,12 +178,13 @@ class _DietaryPreferencesScreenState extends State<DietaryPreferencesScreen> {
         ),
         const SizedBox(height: 20),
 
-        const SettingsLabel('FOOD RESTRICTIONS'),
-        SettingsDropdown(
-          hint: 'Select foods you avoid',
-          value: _restriction,
-          items: restrictionOptions,
-          onChanged: (v) => setState(() => _restriction = v),
+        const SettingsLabel('FOODS YOU AVOID (PICK ALL THAT APPLY)'),
+        PreferenceChips(
+          options: PreferenceOptions.restrictions,
+          allowCustom: true,
+          customHint: 'e.g. Bitter Gourd, Liver',
+          selected: _restrictions,
+          onChanged: (v) => setState(() => _restrictions = v),
         ),
       ],
     );

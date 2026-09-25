@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'update_password.dart';
@@ -47,8 +48,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       _authMessage = null;
       if (code.isEmpty) {
         _otpError = 'Verification code is required.';
-      } else if (code.length < 6) {
-        _otpError = 'Code must be 6 digits.';
+      } else if (!RegExp(r'^\d{6}$').hasMatch(code)) {
+        _otpError = 'Code must be exactly 6 digits.';
       } else {
         _otpError = null;
       }
@@ -60,9 +61,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     setState(() => isLoading = true);
 
     try {
-      // Verify OTP for password recovery
+      // The code comes from signInWithOtp, so it must be verified as an email OTP.
       final AuthResponse response = await Supabase.instance.client.auth
-          .verifyOTP(email: widget.email, token: code, type: OtpType.recovery);
+          .verifyOTP(email: widget.email, token: code, type: OtpType.email);
 
       if (response.user != null) {
         if (mounted) {
@@ -411,6 +412,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           enabled: enabled,
           keyboardType: TextInputType.number,
           maxLength: 6,
+          // Digits only, so letters, spaces and symbols cannot be typed or pasted.
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(6),
+          ],
           textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 24,

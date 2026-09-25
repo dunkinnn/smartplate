@@ -223,3 +223,60 @@
 
 - `dashboard.dart`: Today's Meal Plan on Home is sorted Breakfast, Lunch, Dinner, Snack in the app, not only by `sort_order`.
 - Not committed.
+
+## 2026-09-23 - Phone notifications (Calorie and Nutrient Alert System)
+
+- Dependencies to add: `flutter_local_notifications`, `timezone` (via `flutter pub add`).
+- New `services/alert_service.dart`: meal reminders at 10:00, 14:00, 21:00 Manila time for today (unlogged meals only) and the next two days; instant alerts at 90% and 100% of the calorie goal and for protein under 70% of goal after 18:00, each once per day.
+- Called on app start (`main.dart`), when Home opens, after marking planned meals eaten, after Log Meal saves, after deleting a food in Track. Logout cancels all reminders.
+- Android: core library desugaring in `build.gradle.kts`; POST_NOTIFICATIONS and RECEIVE_BOOT_COMPLETED permissions and scheduled-notification receivers in `AndroidManifest.xml`.
+- Not committed.
+
+## 2026-09-25 - Forgot password fixes
+
+- `otp_verification.dart`: code is verified as `OtpType.email` to match `signInWithOtp` in Forgot Password (was `OtpType.recovery`, which rejects valid codes).
+- `forgot_password.dart`: rate-limit errors are checked first (their message also contains "email"); "Signups not allowed for otp" (unknown email with shouldCreateUser: false) now shows "No account found"; only sending/SMTP failures show "Email service error".
+- Not committed.
+
+## 2026-09-25 - OTP field digits only
+
+- `otp_verification.dart`: code field uses `FilteringTextInputFormatter.digitsOnly` and a 6-character limit, so letters, spaces and symbols cannot be typed or pasted; submit requires exactly 6 digits.
+- Not committed.
+
+## 2026-09-25 - Sample invoice
+
+- Added `docs/sample-email-invoice.pdf`: design sample of an email-service invoice (fictional vendor, SAMPLE watermark, ₱1,150 + ₱150 VAT = ₱1,300) for project documentation.
+- Not committed.
+
+## 2026-09-25 - More nutrients, stricter food checks, more options
+
+- New `supabase/extra-nutrients.sql`: `sugar_g`, `fiber_g`, `saturated_fat_g`, `sodium_mg`, `cholesterol_mg` on `meal_plan_items` and `food_logs` (default 0).
+- New `models/nutrients.dart` (daily guides: sugar 50 g, fiber 25 g, saturated fat 20 g, sodium 2,000 mg, cholesterol 300 mg) and `widgets/nutrient_guide_row.dart`.
+- `food_entry.dart`: new nutrient fields in `fromRow`, `fromPlanItem`, `toRow`.
+- Edge Function: schema and insert include the new nutrients; prompt uses multiple tastes and `nutrition_focus`; allergens and avoided foods are checked in code with everyday and Filipino terms (e.g. Dairy catches cheese, Shellfish catches hipon; coconut milk and eggplant are not false matches).
+- Meal Plan: dish sheet lists the new nutrients; plan card shows them against daily guides. Track: Nutrients card for the day. Insights: daily averages vs guides and tips when limits are passed.
+- Alerts: phone and in-app alerts when sugar, saturated fat, sodium or cholesterol pass the daily guide.
+- `preference_chips.dart`: more allergens (Mollusks, Wheat, Corn, Coconut, Mango) and foods to avoid (Red Meat, Organ Meat, Processed Meat, Spicy Food, Instant Noodles, White Rice, MSG).
+- Not committed.
+
+## 2026-09-25 - Type your own taste, allergen or avoided food
+
+- `preference_chips.dart`: optional "Add your own" chip opens a small dialog; entries are 2-30 letters (spaces, hyphens, apostrophes allowed), title-cased, up to 5 per list, and saved in the same comma list. Typing a built-in option selects it instead. Typed entries show as selected chips; tapping removes them.
+- Enabled for Taste Preferences, Allergens and Foods You Avoid in sign-up (`preferences.dart`) and Settings (`dietary_preferences.dart`). Nutrition focus stays fixed.
+- Typed allergens and avoided foods are checked by the Edge Function as literal words, like the built-in ones.
+- Not committed.
+
+## 2026-09-25 - Sign-up name not asked twice
+
+- `screens/profile.dart` (setup step 1): reads `full_name` saved at sign-up from the user's metadata. When present, the Full Name field is hidden and a "Hi, <first name>!" line is shown; the name is still passed on and saved. The field only appears if the name is missing. It stays editable later in Settings → Personal Info.
+- Not committed.
+
+## 2026-09-25 - Log out loader
+
+- `client/profile.dart`: Log Out shows a full-screen loader ("Logging out...") that cannot be dismissed while reminders are cleared and the session ends, then goes to Login. On failure the loader closes and a friendly message is shown. Double taps are ignored.
+- Not committed.
+
+## 2026-09-25 - Allergy note on Meal Plan
+
+- `meal_plan.dart`: an orange info note ("Always check ingredients and labels if you have a severe allergy...") appears under the meal plan and in each dish's details sheet.
+- Not committed.

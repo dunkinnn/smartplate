@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:smart_plate/features/auth/widgets/notification_bell.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/models/nutrients.dart';
+import 'package:smart_plate/features/auth/widgets/nutrient_guide_row.dart';
 import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/services/calendar_days.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
@@ -88,7 +90,10 @@ class _InsightsScreenState extends State<InsightsScreen> {
 
       final rows = await supabase
           .from('food_logs')
-          .select('logged_date, kcal, protein_g, carbs_g, fat_g')
+          .select(
+            'logged_date, kcal, protein_g, carbs_g, fat_g, '
+            'sugar_g, fiber_g, saturated_fat_g, sodium_mg, cholesterol_mg',
+          )
           .eq('user_id', user.id)
           .gte('logged_date', _key(days.first))
           .lte('logged_date', _key(days.last))
@@ -110,6 +115,10 @@ class _InsightsScreenState extends State<InsightsScreen> {
         day.protein += (map['protein_g'] as num?)?.toDouble() ?? 0;
         day.carbs += (map['carbs_g'] as num?)?.toDouble() ?? 0;
         day.fat += (map['fat_g'] as num?)?.toDouble() ?? 0;
+        for (final n in Nutrient.all) {
+          day.extra[n] =
+              (day.extra[n] ?? 0) + ((map[n.column] as num?)?.toDouble() ?? 0);
+        }
       }
 
       if (!mounted) return;
@@ -520,7 +529,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
     final fat = _avgMacro((d) => d.fat);
 
     return _buildBaseCard(
-      title: "Macronutrients",
+      title: "Nutrients",
       child: _loggedDays.isEmpty
           ? _buildNoDataRow("No macros logged this week.")
           : Column(
@@ -530,6 +539,25 @@ class _InsightsScreenState extends State<InsightsScreen> {
                 _buildNutrientRow("Carbs", carbs, _carbsGoal, darkBlue),
                 const SizedBox(height: 20),
                 _buildNutrientRow("Fats", fat, _fatGoal, accentPink),
+                const SizedBox(height: 24),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "DAILY AVERAGE VS GUIDE",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: textSecondary,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                for (final n in Nutrient.all)
+                  NutrientGuideRow(
+                    nutrient: n,
+                    value: _avgMacro((d) => d.extra[n] ?? 0),
+                  ),
               ],
             ),
     );
@@ -573,6 +601,20 @@ class _InsightsScreenState extends State<InsightsScreen> {
       if (goal != null && goal > 0 && avg < goal * 0.8) {
         tips.add(
           '${m.key} was below your goal: ${avg.round()} g of ${goal.round()} g on average.',
+        );
+      }
+    }
+
+    // Limits passed on average, and fiber well under its target.
+    for (final n in Nutrient.all) {
+      final avg = _avgMacro((d) => d.extra[n] ?? 0);
+      if (n.isLimit && avg > n.dailyGuide) {
+        tips.add(
+          '${n.label} averaged ${n.format(avg)} a day, above the ${n.format(n.dailyGuide)} guide.',
+        );
+      } else if (!n.isLimit && avg > 0 && avg < n.dailyGuide * 0.6) {
+        tips.add(
+          '${n.label} averaged ${n.format(avg)} a day. The guide is ${n.format(n.dailyGuide)}.',
         );
       }
     }
@@ -731,6 +773,9 @@ class _DayTotals {
   double protein = 0;
   double carbs = 0;
   double fat = 0;
+
+  // Sugar, fiber, saturated fat, sodium and cholesterol for the day.
+  final Map<Nutrient, double> extra = {};
 
   _DayTotals(this.date);
 }

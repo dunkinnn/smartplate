@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smart_plate/features/auth/widgets/onboarding_progress.dart';
+import 'package:smart_plate/features/auth/widgets/preference_chips.dart';
 import 'package:smart_plate/features/auth/screens/nutritional_goals.dart';
 
 class PreferencesScreen extends StatefulWidget {
@@ -18,9 +19,10 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   static const Color darkBlue = Color(0xFF334155);
 
   String? selectedDiet;
-  String? selectedTaste;
-  String? selectedAllergen;
-  String? selectedRestriction;
+  Set<String> tastes = {};
+  Set<String> allergens = {};
+  Set<String> restrictions = {};
+  Set<String> nutritionFocus = {};
 
   void _goNext() {
     Navigator.push(
@@ -30,9 +32,10 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
           profileData: {
             ...widget.profileData,
             'diet': selectedDiet,
-            'taste': selectedTaste,
-            'allergen': selectedAllergen,
-            'food_restriction': selectedRestriction,
+            'taste': PreferenceOptions.join(tastes),
+            'allergen': PreferenceOptions.join(allergens),
+            'food_restriction': PreferenceOptions.join(restrictions),
+            'nutrition_focus': PreferenceOptions.join(nutritionFocus),
           },
         ),
       ),
@@ -81,17 +84,26 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
             _buildDropdownField(
               hint: 'Select your diet type',
               value: selectedDiet,
-              items: ['Vegan', 'Keto', 'Paleo', 'Vegetarian', 'None'],
+              items: PreferenceOptions.diets,
               onChanged: (val) => setState(() => selectedDiet = val),
             ),
 
             const SizedBox(height: 20),
-            _buildLabel('TASTE PREFERENCES'),
-            _buildDropdownField(
-              hint: 'Select your preferred taste(s)',
-              value: selectedTaste,
-              items: ['Sweet', 'Spicy', 'Salty', 'Bitter', 'Savory'],
-              onChanged: (val) => setState(() => selectedTaste = val),
+            _buildLabel('TASTE PREFERENCES (PICK ANY)'),
+            PreferenceChips(
+              options: PreferenceOptions.tastes,
+              allowCustom: true,
+              customHint: 'e.g. Garlicky, Tangy',
+              selected: tastes,
+              onChanged: (v) => setState(() => tastes = v),
+            ),
+
+            const SizedBox(height: 20),
+            _buildLabel('NUTRITION FOCUS (PICK ANY)'),
+            PreferenceChips(
+              options: PreferenceOptions.nutritionFocus,
+              selected: nutritionFocus,
+              onChanged: (v) => setState(() => nutritionFocus = v),
             ),
 
             const SizedBox(height: 35),
@@ -106,21 +118,23 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _buildLabel('ALLERGENS'),
-            _buildDropdownField(
-              hint: 'Select allergens you have',
-              value: selectedAllergen,
-              items: ['None', 'Peanuts', 'Dairy', 'Gluten', 'Shellfish'],
-              onChanged: (val) => setState(() => selectedAllergen = val),
+            _buildLabel('ALLERGENS (PICK ALL THAT APPLY)'),
+            PreferenceChips(
+              options: PreferenceOptions.allergens,
+              allowCustom: true,
+              customHint: 'e.g. Kiwi, Tomato',
+              selected: allergens,
+              onChanged: (v) => setState(() => allergens = v),
             ),
 
             const SizedBox(height: 20),
-            _buildLabel('FOOD RESTRICTIONS'),
-            _buildDropdownField(
-              hint: 'Select foods you avoid',
-              value: selectedRestriction,
-              items: ['None', 'Pork', 'Beef', 'Alcohol', 'Processed Sugar'],
-              onChanged: (val) => setState(() => selectedRestriction = val),
+            _buildLabel('FOODS YOU AVOID (PICK ALL THAT APPLY)'),
+            PreferenceChips(
+              options: PreferenceOptions.restrictions,
+              allowCustom: true,
+              customHint: 'e.g. Bitter Gourd, Liver',
+              selected: restrictions,
+              onChanged: (v) => setState(() => restrictions = v),
             ),
 
             const SizedBox(height: 40),

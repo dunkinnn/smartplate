@@ -123,16 +123,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           _emailAttempts++;
           _checkEmailLockout();
 
-          if (e.message.toLowerCase().contains('user')) {
-            _authMessage = 'No account found with this email address.';
-          } else if (e.message.toLowerCase().contains('email')) {
-            _authMessage = 'Email service error. Please try again later.';
-          } else if (e.message.toLowerCase().contains('rate')) {
+          final msg = e.message.toLowerCase();
+          // Rate limits are checked first, since their message also mentions email.
+          if (msg.contains('rate') || msg.contains('too many')) {
             _authMessage =
                 'Too many requests. Please wait before trying again.';
             _resendAttempts = _maxResendAttempts;
             _resendCountdown = 300; // 5 minutes
             _startResendCooldown();
+          } else if (msg.contains('signups not allowed') ||
+              msg.contains('user not found')) {
+            // shouldCreateUser: false rejects emails with no account this way.
+            _authMessage = 'No account found with this email address.';
+          } else if (msg.contains('sending') || msg.contains('smtp')) {
+            _authMessage = 'Email service error. Please try again later.';
           } else {
             _authMessage = friendlyError(e);
           }

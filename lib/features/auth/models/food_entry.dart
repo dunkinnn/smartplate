@@ -7,6 +7,11 @@ class FoodEntry {
   final double proteinG;
   final double carbsG;
   final double fatG;
+  final double sugarG;
+  final double fiberG;
+  final double saturatedFatG;
+  final double sodiumMg;
+  final double cholesterolMg;
   final String source;
 
   const FoodEntry({
@@ -17,8 +22,16 @@ class FoodEntry {
     this.proteinG = 0,
     this.carbsG = 0,
     this.fatG = 0,
+    this.sugarG = 0,
+    this.fiberG = 0,
+    this.saturatedFatG = 0,
+    this.sodiumMg = 0,
+    this.cholesterolMg = 0,
     this.source = 'custom',
   });
+
+  static double _num(Map<String, dynamic> row, String key) =>
+      (row[key] as num?)?.toDouble() ?? 0;
 
   factory FoodEntry.fromRow(Map<String, dynamic> row) => FoodEntry(
     id: row['id'] as String?,
@@ -28,6 +41,11 @@ class FoodEntry {
     proteinG: (row['protein_g'] as num?)?.toDouble() ?? 0,
     carbsG: (row['carbs_g'] as num?)?.toDouble() ?? 0,
     fatG: (row['fat_g'] as num?)?.toDouble() ?? 0,
+    sugarG: _num(row, 'sugar_g'),
+    fiberG: _num(row, 'fiber_g'),
+    saturatedFatG: _num(row, 'saturated_fat_g'),
+    sodiumMg: _num(row, 'sodium_mg'),
+    cholesterolMg: _num(row, 'cholesterol_mg'),
     source: row['source'] as String? ?? 'custom',
   );
 
@@ -39,6 +57,11 @@ class FoodEntry {
     proteinG: (item['protein_g'] as num?)?.toDouble() ?? 0,
     carbsG: (item['carbs_g'] as num?)?.toDouble() ?? 0,
     fatG: (item['fat_g'] as num?)?.toDouble() ?? 0,
+    sugarG: _num(item, 'sugar_g'),
+    fiberG: _num(item, 'fiber_g'),
+    saturatedFatG: _num(item, 'saturated_fat_g'),
+    sodiumMg: _num(item, 'sodium_mg'),
+    cholesterolMg: _num(item, 'cholesterol_mg'),
     source: 'plan',
   );
 
@@ -57,6 +80,11 @@ class FoodEntry {
     'protein_g': proteinG,
     'carbs_g': carbsG,
     'fat_g': fatG,
+    'sugar_g': sugarG,
+    'fiber_g': fiberG,
+    'saturated_fat_g': saturatedFatG,
+    'sodium_mg': sodiumMg,
+    'cholesterol_mg': cholesterolMg,
     'source': source,
   };
 

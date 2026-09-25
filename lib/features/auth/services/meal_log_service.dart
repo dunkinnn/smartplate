@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/alert_service.dart';
 import 'package:smart_plate/features/auth/models/food_entry.dart';
 
 // Records planned meals as eaten; Track and Home share these food_logs rows.
@@ -72,5 +73,8 @@ class MealLogService {
           .eq('meal_type', mealType)
           .eq('source', 'plan');
     }
+
+    // Logged meals change which reminders and goal alerts apply.
+    await AlertService.update();
   }
 }

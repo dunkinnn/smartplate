@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/services/alert_service.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/screens/login.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
 import 'package:smart_plate/features/auth/screens/client/settings/dietary_preferences.dart';
@@ -19,6 +21,63 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  bool _isLoggingOut = false;
+
+  // Shows a full-screen loader while signing out, then returns to Login.
+  Future<void> _logOut() async {
+    if (_isLoggingOut) return;
+    setState(() => _isLoggingOut = true);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.white.withValues(alpha: 0.85),
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Color(0xFF67A75F)),
+              SizedBox(height: 16),
+              Material(
+                color: Colors.transparent,
+                child: Text(
+                  "Logging out...",
+                  style: TextStyle(
+                    color: Color(0xFF1E293B),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      // Reminders belong to this account, so clear them on logout.
+      await AlertService.cancelAll();
+      await _supabase.auth.signOut();
+      if (!mounted) return;
+
+      // Removes the loader and every screen, leaving only Login.
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      debugPrint('Failed to log out: $e');
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      setState(() => _isLoggingOut = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyError(e))),
+      );
+    }
+  }
   late final SupabaseClient _supabase;
   String userName = "User";
   String userEmail = "";
@@ -185,17 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: TextButton(
-                onPressed: () async {
-                  await _supabase.auth.signOut();
-
-                  if (!mounted) return;
-
-                  Navigator.pushAndRemoveUntil(
-                    this.context,
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    (route) => false,
-                  );
-                },
+                onPressed: _logOut,
                 style: TextButton.styleFrom(
                   minimumSize: const Size(double.infinity, 56),
                   shape: RoundedRectangleBorder(

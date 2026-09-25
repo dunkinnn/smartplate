@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:smart_plate/features/auth/widgets/notification_bell.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:smart_plate/features/auth/models/nutrients.dart';
+import 'package:smart_plate/features/auth/widgets/nutrient_guide_row.dart';
+import 'package:smart_plate/features/auth/services/alert_service.dart';
 import 'package:smart_plate/features/auth/services/calendar_days.dart';
 import 'package:smart_plate/features/auth/models/food_entry.dart';
 import 'package:smart_plate/features/auth/services/meal_log_service.dart';
@@ -128,6 +131,19 @@ class _TrackScreenState extends State<TrackScreen> {
       .expand((list) => list)
       .fold(0, (sum, food) => sum + food.kcal);
 
+  double _total(double Function(FoodEntry) pick) => logsByMeal.values
+      .expand((list) => list)
+      .fold(0.0, (sum, food) => sum + pick(food));
+
+  // Maps each tracked nutrient to its field on a logged food.
+  static final Map<Nutrient, double Function(FoodEntry)> _nutrientOf = {
+    Nutrient.sugar: (f) => f.sugarG,
+    Nutrient.fiber: (f) => f.fiberG,
+    Nutrient.saturatedFat: (f) => f.saturatedFatG,
+    Nutrient.sodium: (f) => f.sodiumMg,
+    Nutrient.cholesterol: (f) => f.cholesterolMg,
+  };
+
   // Only today can be changed; other days are read-only history or plans.
   bool get _isToday => _dateKey(selectedDate) == _dateKey(DateTime.now());
 
@@ -194,6 +210,7 @@ class _TrackScreenState extends State<TrackScreen> {
           .delete()
           .eq('id', item.id!);
       await _loadDay(showSpinner: false);
+      AlertService.update();
     } catch (e) {
       debugPrint('Failed to remove food: $e');
     }
@@ -231,7 +248,11 @@ class _TrackScreenState extends State<TrackScreen> {
                   _buildHorizontalCalendar(),
                   const SizedBox(height: 25),
                   _buildCalorieProgressCard(),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 20),
+                  if (!_isFuture) ...[
+                    _buildNutrientsCard(),
+                    const SizedBox(height: 30),
+                  ],
 
                   _buildSectionHeader("DAILY LOGS"),
                   if (isLoading)
@@ -482,6 +503,54 @@ class _TrackScreenState extends State<TrackScreen> {
     RegExp(r'(\d)(?=(\d{3})+$)'),
     (m) => '${m[1]},',
   );
+
+  // Everything eaten on the selected day beyond calories.
+  Widget _buildNutrientsCard() {
+    Widget macro(String label, double grams) => Expanded(
+      child: Column(
+        children: [
+          Text(
+            "${grams.round()} g",
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+              color: darkBlue,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, color: textSecondary),
+          ),
+        ],
+      ),
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: bgLight,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader("NUTRIENTS"),
+          Row(
+            children: [
+              macro("Protein", _total((f) => f.proteinG)),
+              macro("Carbs", _total((f) => f.carbsG)),
+              macro("Fat", _total((f) => f.fatG)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          for (final e in _nutrientOf.entries)
+            NutrientGuideRow(nutrient: e.key, value: _total(e.value)),
+        ],
+      ),
+    );
+  }
 
   Widget _buildSectionHeader(String title) {
     return Container(
