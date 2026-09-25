@@ -342,3 +342,8 @@
 
 - `meal_plan.dart`, `track.dart`: calendar days after today are faded and cannot be tapped; today and past days work as before.
 - Not committed.
+
+## 2026-09-25 - Profile header overflow
+
+- `client/profile.dart`: streak pill in the header facts row wrapped in `FittedBox(scaleDown)`, fixing a 2.6 px right overflow on narrow screens.
+- Not committed.

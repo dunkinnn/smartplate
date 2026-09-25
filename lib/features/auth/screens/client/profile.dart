@@ -374,7 +374,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: TextStyle(fontSize: 11, color: textSecondary),
                     ),
                     const SizedBox(height: 4),
-                    StreakPill(days: _streak),
+                    // Scales down on narrow screens instead of overflowing.
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: StreakPill(days: _streak),
+                    ),
                   ],
                 ),
               ),
