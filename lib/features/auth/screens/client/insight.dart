@@ -33,6 +33,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
   double? _fatGoal;
   bool _isLoading = true;
   int _streak = 0;
+
+  // Sugar, fiber and the rest stay folded until the user asks for them.
+  bool _showAllNutrients = false;
   String? _error;
 
   @override
@@ -327,34 +330,45 @@ class _InsightsScreenState extends State<InsightsScreen> {
     );
   }
 
-  Widget _buildBaseCard({required String title, required Widget child}) {
+  Widget _buildBaseCard({
+    required String title,
+    required Widget child,
+    Widget? trailing,
+  }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: borderColor, width: 1), // Standard 1px Border
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              color: darkBlue,
-              letterSpacing: -0.3,
-            ),
+          Row(
+            children: [
+              Text(
+                title.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: textSecondary,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const Spacer(),
+              ?trailing,
+            ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           child,
         ],
       ),
     );
   }
 
+  // Average intake this week against the goal, in the same style as Meal Plan.
   Widget _buildCalorieIntakeCard() {
     final target = _calorieTarget;
     final avg = _avgKcal;
@@ -362,75 +376,105 @@ class _InsightsScreenState extends State<InsightsScreen> {
         ? (avg / target).clamp(0.0, 1.0)
         : 0.0;
 
-    final status = _loggedDays.isEmpty
-        ? "No data"
+    final (status, statusColor) = _loggedDays.isEmpty
+        ? ("No data yet", textSecondary)
         : target == null
-        ? "No goal set"
+        ? ("No goal set", textSecondary)
         : avg > target * 1.1
-        ? "Over target"
+        ? ("Over target", accentPink)
         : avg < target * 0.8
-        ? "Under target"
-        : "On Track";
+        ? ("Under target", textSecondary)
+        : ("On track", brandGreen);
 
-    return _buildBaseCard(
-      title: "Average Daily Intake",
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Stack(
-            alignment: Alignment.center,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                height: 110,
-                width: 110,
-                child: CircularProgressIndicator(
-                  value: progress,
-                  strokeWidth: 10,
-                  color: brandGreen,
-                  backgroundColor: borderColor.withValues(alpha: 0.5),
-                  strokeCap: StrokeCap.round,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "AVERAGE DAILY INTAKE",
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: textSecondary,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: _formatNumber(avg),
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: darkBlue,
+                              letterSpacing: -1,
+                            ),
+                          ),
+                          const TextSpan(
+                            text: " kcal",
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _formatNumber(avg),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 22,
-                      color: darkBlue,
-                    ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: statusColor,
                   ),
-                  const Text(
-                    "kcal",
-                    style: TextStyle(
-                      color: textSecondary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildMiniStat(
-                "Daily Goal",
-                target != null ? _formatNumber(target) : "—",
-                brandGreen,
-              ),
-              const SizedBox(height: 15),
-              _buildMiniStat("Overall Status", status, darkBlue),
-              const SizedBox(height: 15),
-              _buildMiniStat(
-                "Days Logged",
-                "${_loggedDays.length} of $_daysSoFar",
-                textSecondary,
-              ),
-            ],
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              color: statusColor == accentPink ? accentPink : brandGreen,
+              backgroundColor: borderColor,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            "${target != null ? 'Goal ${_formatNumber(target)} kcal · ' : ''}"
+            "${_loggedDays.length} of $_daysSoFar days logged",
+            style: const TextStyle(fontSize: 12, color: textSecondary),
           ),
         ],
       ),
@@ -451,9 +495,31 @@ class _InsightsScreenState extends State<InsightsScreen> {
 
     return _buildBaseCard(
       title: "Weekly Calorie Trend",
+      trailing: target != null
+          ? Text(
+              "- - goal",
+              style: TextStyle(
+                fontSize: 11,
+                color: textSecondary.withValues(alpha: 0.8),
+              ),
+            )
+          : null,
       child: _loggedDays.isEmpty
           ? _buildNoDataRow("Log a meal to see your trend.")
-          : Row(
+          : Stack(
+              children: [
+                // Goal line at full bar height, since bars are scaled to the goal.
+                if (target != null)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      height: 1,
+                      color: textSecondary.withValues(alpha: 0.35),
+                    ),
+                  ),
+                Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: _week
@@ -468,6 +534,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
                     ),
                   )
                   .toList(),
+                ),
+              ],
             ),
     );
   }
@@ -480,10 +548,15 @@ class _InsightsScreenState extends State<InsightsScreen> {
   }) {
     return Column(
       children: [
-        Container(
+        // Fixed-height slot so every bar starts from the same baseline.
+        SizedBox(
+          height: 100,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
           // Keeps empty days visible as a sliver rather than nothing at all.
           height: (100 * heightFactor).clamp(4.0, 100.0),
-          width: 30,
+          width: 22,
           decoration: BoxDecoration(
             // Days still ahead in the week are shown as a faint placeholder.
             color: isFuture
@@ -491,10 +564,12 @@ class _InsightsScreenState extends State<InsightsScreen> {
                 : isOver
                 ? accentPink
                 : brandGreen,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
           ),
         ),
-        const SizedBox(height: 10),
+          ),
+        ),
+        const SizedBox(height: 8),
         Text(
           day,
           style: const TextStyle(
@@ -524,42 +599,122 @@ class _InsightsScreenState extends State<InsightsScreen> {
   }
 
   Widget _buildNutrientDistributionCard() {
-    final protein = _avgMacro((d) => d.protein);
-    final carbs = _avgMacro((d) => d.carbs);
-    final fat = _avgMacro((d) => d.fat);
-
     return _buildBaseCard(
-      title: "Nutrients",
+      title: "Nutrients (daily average)",
       child: _loggedDays.isEmpty
-          ? _buildNoDataRow("No macros logged this week.")
+          ? _buildNoDataRow("No nutrients logged this week.")
           : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildNutrientRow("Protein", protein, _proteinGoal, brandGreen),
-                const SizedBox(height: 20),
-                _buildNutrientRow("Carbs", carbs, _carbsGoal, darkBlue),
-                const SizedBox(height: 20),
-                _buildNutrientRow("Fats", fat, _fatGoal, accentPink),
-                const SizedBox(height: 24),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    "DAILY AVERAGE VS GUIDE",
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: textSecondary,
-                      letterSpacing: 1.2,
+                Row(
+                  children: [
+                    _buildMacroStat(
+                      "Protein",
+                      _avgMacro((d) => d.protein),
+                      _proteinGoal,
+                      brandGreen,
+                    ),
+                    const SizedBox(width: 12),
+                    _buildMacroStat(
+                      "Carbs",
+                      _avgMacro((d) => d.carbs),
+                      _carbsGoal,
+                      darkBlue,
+                    ),
+                    const SizedBox(width: 12),
+                    _buildMacroStat(
+                      "Fat",
+                      _avgMacro((d) => d.fat),
+                      _fatGoal,
+                      accentPink,
+                    ),
+                  ],
+                ),
+                InkWell(
+                  onTap: () =>
+                      setState(() => _showAllNutrients = !_showAllNutrients),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Row(
+                      children: [
+                        Text(
+                          _showAllNutrients
+                              ? "Hide nutrients"
+                              : "See all nutrients",
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: brandGreen,
+                          ),
+                        ),
+                        Icon(
+                          _showAllNutrients
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                          color: brandGreen,
+                          size: 20,
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                for (final n in Nutrient.all)
-                  NutrientGuideRow(
-                    nutrient: n,
-                    value: _avgMacro((d) => d.extra[n] ?? 0),
-                  ),
+                if (_showAllNutrients)
+                  for (final n in Nutrient.all)
+                    NutrientGuideRow(
+                      nutrient: n,
+                      value: _avgMacro((d) => d.extra[n] ?? 0),
+                    ),
               ],
             ),
+    );
+  }
+
+  // Average grams for one macro with a thin bar against the goal.
+  Widget _buildMacroStat(
+    String label,
+    double grams,
+    double? goal,
+    Color color,
+  ) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: textSecondary),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            "${grams.round()} g",
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: darkBlue,
+            ),
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: goal != null && goal > 0
+                  ? (grams / goal).clamp(0.0, 1.0)
+                  : 0,
+              minHeight: 5,
+              color: color,
+              backgroundColor: borderColor,
+            ),
+          ),
+          if (goal != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              "of ${goal.round()} g",
+              style: const TextStyle(fontSize: 11, color: textSecondary),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -630,10 +785,10 @@ class _InsightsScreenState extends State<InsightsScreen> {
   Widget _buildAIInsightsCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: darkBlue,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -653,7 +808,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           for (final tip in _adviceTips)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -668,12 +823,12 @@ class _InsightsScreenState extends State<InsightsScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "• ",
-          style: TextStyle(
-            color: brandGreen,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+        const Padding(
+          padding: EdgeInsets.only(top: 2, right: 10),
+          child: Icon(
+            Icons.lightbulb_outline_rounded,
+            color: Colors.amber,
+            size: 16,
           ),
         ),
         Expanded(
@@ -686,80 +841,6 @@ class _InsightsScreenState extends State<InsightsScreen> {
               fontWeight: FontWeight.w500,
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMiniStat(String label, String value, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: textSecondary,
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.w900,
-            fontSize: 16,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNutrientRow(
-    String label,
-    double grams,
-    double? goal,
-    Color color,
-  ) {
-    final progress = (goal != null && goal > 0)
-        ? (grams / goal).clamp(0.0, 1.0)
-        : 0.0;
-    final display = grams % 1 == 0
-        ? grams.toStringAsFixed(0)
-        : grams.toStringAsFixed(1);
-
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                color: darkBlue,
-                fontSize: 14,
-              ),
-            ),
-            Text(
-              goal != null
-                  ? "${display}g / ${goal.toStringAsFixed(0)}g"
-                  : "${display}g",
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 13,
-                color: textSecondary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        LinearProgressIndicator(
-          value: progress,
-          minHeight: 10,
-          color: color,
-          backgroundColor: borderColor.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(10),
         ),
       ],
     );

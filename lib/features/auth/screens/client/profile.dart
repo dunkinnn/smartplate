@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/services/alert_service.dart';
+import 'package:smart_plate/features/auth/services/meal_log_service.dart';
+import 'package:smart_plate/features/auth/widgets/meal_badge.dart';
 import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/screens/login.dart';
 import 'package:smart_plate/features/auth/screens/client/notification.dart';
@@ -83,6 +85,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String userEmail = "";
   String? profileImageUrl;
 
+  // Quick facts under the name, like the stats on Home.
+  int? _calorieTarget;
+  String? _diet;
+  int _streak = 0;
+
+  static const Color brandGreen = Color(0xFF67A75F);
+
   // Color Palette
   static const Color darkBlue = Color(0xFF1E293B);
   static const Color textSecondary = Color(0xFF64748B);
@@ -108,6 +117,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // Fetch additional data in background (optional)
     _fetchUserDataOptimized();
+    _loadStreak();
+  }
+
+  Future<void> _loadStreak() async {
+    try {
+      final streak = await MealLogService.currentStreak();
+      if (mounted) setState(() => _streak = streak);
+    } catch (e) {
+      debugPrint('Failed to load streak: $e');
+    }
   }
 
   Future<void> _fetchUserDataOptimized() async {
@@ -118,7 +137,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // Extra data lives in user_profiles, written by the signup wizard.
         final response = await _supabase
             .from('user_profiles')
-            .select('full_name, avatar_url')
+            .select('full_name, avatar_url, calorie_target, diet')
             .eq('id', user.id)
             .maybeSingle()
             .timeout(
@@ -134,6 +153,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (response['avatar_url'] != null) {
               profileImageUrl = response['avatar_url'];
             }
+            _calorieTarget = (response['calorie_target'] as num?)?.round();
+            _diet = response['diet'] as String?;
           });
         }
       }
@@ -275,55 +296,112 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Photo, name and email, with the user's goal, diet and streak underneath.
   Widget _buildUserHeader() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: bgGray,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: borderColor, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: const BoxDecoration(
+                  color: brandGreen,
+                  shape: BoxShape.circle,
+                ),
+                child: CircleAvatar(
+                  radius: 32,
+                  backgroundColor: Colors.white,
+                  backgroundImage: profileImageUrl != null
+                      ? NetworkImage(profileImageUrl!)
+                      : const AssetImage('assets/images/profile.png')
+                            as ImageProvider,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      userName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: darkBlue,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    Text(
+                      userEmail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildFact(
+                "Daily goal",
+                _calorieTarget != null ? "$_calorieTarget kcal" : "—",
+              ),
+              _buildFact(
+                "Diet",
+                _diet == null || _diet!.isEmpty ? "None" : _diet!,
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    const Text(
+                      "Streak",
+                      style: TextStyle(fontSize: 11, color: textSecondary),
+                    ),
+                    const SizedBox(height: 4),
+                    StreakPill(days: _streak),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
-      child: Row(
+    );
+  }
+
+  Widget _buildFact(String label, String value) {
+    return Expanded(
+      child: Column(
         children: [
-          CircleAvatar(
-            radius: 38,
-            backgroundColor: bgGray,
-            backgroundImage: profileImageUrl != null
-                ? NetworkImage(profileImageUrl!)
-                : const AssetImage('assets/images/profile.png')
-                      as ImageProvider,
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, color: textSecondary),
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  userName,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: darkBlue,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                Text(
-                  userEmail,
-                  style: const TextStyle(
-                    color: textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: darkBlue,
             ),
           ),
         ],
@@ -333,16 +411,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(left: 32, bottom: 12),
+      padding: const EdgeInsets.only(left: 28, bottom: 10),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
           title,
           style: const TextStyle(
             fontSize: 11,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             color: textSecondary,
-            letterSpacing: 1.5,
+            letterSpacing: 1.2,
           ),
         ),
       ),
@@ -381,13 +459,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             horizontal: 20,
             vertical: 4,
           ),
+          // Same tinted icon tile as the meal icons elsewhere.
           leading: Container(
-            padding: const EdgeInsets.all(10),
+            height: 38,
+            width: 38,
             decoration: BoxDecoration(
-              color: bgGray,
+              color: brandGreen.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: darkBlue, size: 20),
+            child: Icon(icon, color: brandGreen, size: 20),
           ),
           title: Text(
             title,
@@ -402,9 +482,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             style: const TextStyle(fontSize: 12, color: textSecondary),
           ),
           trailing: const Icon(
-            Icons.arrow_forward_ios_rounded,
-            color: borderColor,
-            size: 14,
+            Icons.chevron_right_rounded,
+            color: textSecondary,
+            size: 22,
           ),
           onTap: onTap,
         ),

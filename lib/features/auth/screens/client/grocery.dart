@@ -52,7 +52,6 @@ class _GroceryScreenState extends State<GroceryScreen> {
 
   List<GroceryItem> _items = [];
   int _mealCount = 0;
-  int _dayCount = 0;
 
   // Earliest and latest planned days on the list, for the header label.
   DateTime? _firstDay;
@@ -121,7 +120,6 @@ class _GroceryScreenState extends State<GroceryScreen> {
         setState(() {
           _items = [];
           _mealCount = 0;
-          _dayCount = 0;
           _hasPlan = false;
           _isLoading = false;
         });
@@ -167,7 +165,6 @@ class _GroceryScreenState extends State<GroceryScreen> {
       setState(() {
         _items = _merge(rows);
         _mealCount = planItems.length;
-        _dayCount = planIds.length;
         _firstDay = planDays.first;
         _lastDay = planDays.last;
         _hasPlan = true;
@@ -529,37 +526,50 @@ class _GroceryScreenState extends State<GroceryScreen> {
     final total = _items.length;
     final progress = total == 0 ? 0.0 : _boughtCount / total;
 
+    final left = total - _boughtCount;
+
     return Container(
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Expanded lets a long date range wrap instead of pushing the chip off screen.
+              // Expanded lets a long date range wrap instead of pushing the pill off screen.
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Text(
+                      "SHOPPING LIST",
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: textSecondary,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Text(
                       dateLabel,
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.w900,
                         color: darkBlue,
                       ),
                     ),
                     Text(
-                      "$_mealCount meals, $_dayCount planned ${_dayCount == 1 ? 'day' : 'days'}",
+                      "$_mealCount meals · $total items",
                       style: const TextStyle(
                         color: textSecondary,
-                        fontSize: 13,
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -568,27 +578,27 @@ class _GroceryScreenState extends State<GroceryScreen> {
               const SizedBox(width: 12),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
+                  horizontal: 10,
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: brandGreen,
-                  borderRadius: BorderRadius.circular(10),
+                  color: brandGreen.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  "$total Items",
+                  left == 0 ? "All bought" : "$left left",
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                    color: brandGreen,
+                    fontWeight: FontWeight.w800,
                     fontSize: 12,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           ClipRRect(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 8,
@@ -599,41 +609,44 @@ class _GroceryScreenState extends State<GroceryScreen> {
           const SizedBox(height: 8),
           Text(
             "$_boughtCount of $total bought",
-            style: const TextStyle(
-              color: textSecondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
+            style: const TextStyle(color: textSecondary, fontSize: 12),
           ),
         ],
       ),
     );
   }
 
-  // One meal's items: still to buy first, bought ones folded underneath.
+  // One card per meal: items still to buy first, bought ones folded underneath.
   Widget _buildMealSection(String meal, List<GroceryItem> items) {
     final toBuy = items.where((i) => !i.isBought).toList();
     final bought = items.where((i) => i.isBought).toList();
     final expanded = _showBought.contains(meal);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 28, bottom: 12, left: 4),
-          child: Row(
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              MealBadge(mealType: meal, size: 32),
-              const SizedBox(width: 10),
-              Text(
-                meal,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  color: darkBlue,
-                  fontSize: 16,
+              MealBadge(mealType: meal, size: 36),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  meal,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: darkBlue,
+                    fontSize: 16,
+                  ),
                 ),
               ),
-              const Spacer(),
               Text(
                 "${bought.length}/${items.length}",
                 style: const TextStyle(
@@ -644,49 +657,51 @@ class _GroceryScreenState extends State<GroceryScreen> {
               ),
             ],
           ),
-        ),
-        ...toBuy.map(_buildGroceryTile),
-        if (bought.isNotEmpty)
-          InkWell(
-            onTap: () => setState(() {
-              if (expanded) {
-                _showBought.remove(meal);
-              } else {
-                _showBought.add(meal);
-              }
-            }),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    color: brandGreen,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    "Bought (${bought.length})",
-                    style: const TextStyle(
+          const SizedBox(height: 8),
+          ...toBuy.map(_buildGroceryTile),
+          if (bought.isNotEmpty)
+            InkWell(
+              onTap: () => setState(() {
+                if (expanded) {
+                  _showBought.remove(meal);
+                } else {
+                  _showBought.add(meal);
+                }
+              }),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_rounded,
                       color: brandGreen,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
+                      size: 18,
                     ),
-                  ),
-                  const Spacer(),
-                  Icon(
-                    expanded
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                    color: textSecondary,
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Text(
+                      "Bought (${bought.length})",
+                      style: const TextStyle(
+                        color: brandGreen,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      expanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      color: textSecondary,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        if (expanded) ...bought.map(_buildGroceryTile),
-      ],
+          if (expanded) ...bought.map(_buildGroceryTile),
+          if (toBuy.isEmpty && bought.isEmpty) const SizedBox(height: 8),
+        ],
+      ),
     );
   }
 
@@ -766,75 +781,64 @@ class _GroceryScreenState extends State<GroceryScreen> {
     );
   }
 
+  // One ingredient: round check, name and amount, and a small category icon.
   Widget _buildGroceryTile(GroceryItem item) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: item.isBought ? const Color(0xFFF1F5F9) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: item.isBought ? Colors.transparent : const Color(0xFFE2E8F0),
-        ),
-        boxShadow: item.isBought
-            ? []
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+    final done = item.isBought;
+
+    return InkWell(
+      onTap: () => _toggleItem(item, !done),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 24,
+              width: 24,
+              decoration: BoxDecoration(
+                color: done ? brandGreen : Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: done ? brandGreen : const Color(0xFFCBD5E1),
+                  width: 2,
                 ),
-              ],
-      ),
-      child: Theme(
-        data: ThemeData(
-          checkboxTheme: CheckboxThemeData(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(6),
+              ),
+              child: done
+                  ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
+                  : null,
             ),
-          ),
-        ),
-        child: CheckboxListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
-          ),
-          value: item.isBought,
-          activeColor: brandGreen,
-          onChanged: (bool? value) => _toggleItem(item, value ?? false),
-          title: Text(
-            item.name,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: item.isBought ? textSecondary : darkBlue,
-              decoration: item.isBought ? TextDecoration.lineThrough : null,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: done ? textSecondary : darkBlue,
+                      decoration: done ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                  if (item.quantity.isNotEmpty)
+                    Text(
+                      item.quantity,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: textSecondary,
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-          subtitle: Text(
-            item.quantity,
-            style: TextStyle(
-              fontSize: 13,
-              color: item.isBought
-                  ? textSecondary.withValues(alpha: 0.5)
-                  : textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          secondary: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: item.isBought
-                  ? Colors.white.withValues(alpha: 0.5)
-                  : brandGreen.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
+            Icon(
               _getCategoryIcon(item.category),
-              color: item.isBought ? textSecondary : brandGreen,
-              size: 22,
+              color: done ? const Color(0xFFCBD5E1) : textSecondary,
+              size: 18,
             ),
-          ),
+          ],
         ),
       ),
     );

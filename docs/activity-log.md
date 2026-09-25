@@ -308,3 +308,27 @@
 - `meal_plan.dart`: the in-page "Plan confirmed" card is removed; confirmed plans show no action buttons. New optional `onOpenTrack`, passed from `dashboard.dart`.
 - `track.dart`: lint fix, null-aware element `?planned`.
 - Not committed.
+
+## 2026-09-25 - Cleaner Insights layout
+
+- `insight.dart` (date chip and streak row unchanged): the ring card becomes a summary card like Meal Plan (average kcal, status pill, progress bar, "Goal X kcal · N of M days logged").
+- Cards share one style: small uppercase grey titles, 20px padding and radius.
+- Weekly trend: slimmer bars on a shared baseline with a goal line.
+- Nutrients: protein, carbs and fat as compact stats against goals; sugar, fiber and the rest fold under "See all nutrients".
+- Smart Advice: tips use a lightbulb icon instead of bullets. Unused `_buildMiniStat` and `_buildNutrientRow` removed.
+- Not committed.
+
+## 2026-09-25 - Cleaner Grocery and Profile
+
+- `grocery.dart`: header card matches the other summaries ("SHOPPING LIST", date, "N meals · M items", "X left" pill, progress bar). Each meal is one card with compact rows (round check, name and amount, small category icon) instead of a separate card per item. Unused `_dayCount` removed.
+- `client/profile.dart`: header card with a green-ringed photo, name and email, plus Daily goal, Diet and Streak. Option icons use the green tinted tile; chevron trailing icon; section headers aligned with the cards.
+- Not committed.
+
+## 2026-09-25 - Cleaner Log Nutrition screen
+
+- `log_meal.dart` (calendar unchanged): sections labelled MEAL, ADD FOOD, YOUR PLATE in the shared small uppercase style.
+- Meal type: four equal chips with the Home meal icons; selected chip is green tinted with a green border.
+- Search field is flat grey with a light border; saved-food suggestions are rounded white pills.
+- One "plate" card holds the meal header and total, each staged food (with a remove button), an "Add custom food" link and protein/carbs/fat totals, replacing the separate empty state, food cards, custom button and macro card.
+- Save button reads "Save to Track".
+- Not committed.
