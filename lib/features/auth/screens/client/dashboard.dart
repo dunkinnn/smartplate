@@ -121,6 +121,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .select('id')
           .eq('user_id', user.id)
           .eq('plan_date', _todayKey)
+          // Home shows today's plan only after it is confirmed.
+          .not('saved_at', 'is', null)
           .maybeSingle();
 
       if (plan == null) {
@@ -857,7 +859,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            "Generate one from your goals and preferences.",
+            "Generate one, then tap Use this plan to see it here.",
             textAlign: TextAlign.center,
             style: TextStyle(
               color: textSecondary,

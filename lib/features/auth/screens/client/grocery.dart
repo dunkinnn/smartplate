@@ -108,6 +108,8 @@ class _GroceryScreenState extends State<GroceryScreen> {
           .eq('user_id', user.id)
           .gte('plan_date', _dateKey(today))
           .lte('plan_date', _dateKey(today))
+          // Groceries come only from a plan confirmed with "Use this plan".
+          .not('saved_at', 'is', null)
           .timeout(const Duration(seconds: 10));
 
       final planIds = [for (final p in plans) p['id'] as String];
@@ -479,7 +481,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                "Generate today's meal plan and its ingredients will appear here.",
+                "Generate today's meal plan and tap Use this plan. Its ingredients will appear here.",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,

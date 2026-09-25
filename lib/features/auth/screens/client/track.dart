@@ -89,11 +89,13 @@ class _TrackScreenState extends State<TrackScreen> {
           .eq('id', user.id)
           .maybeSingle();
 
+      // Only a plan confirmed with "Use this plan" shows up in Track.
       final plan = await supabase
           .from('meal_plans')
           .select('id')
           .eq('user_id', user.id)
           .eq('plan_date', _dateKey(selectedDate))
+          .not('saved_at', 'is', null)
           .maybeSingle();
 
       final planItems = plan == null

@@ -856,7 +856,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         ),
         Spacer(),
         Text(
-          "Tap a dish for details",
+          "Tap a dish for recipe",
           style: TextStyle(fontSize: 12, color: textSecondary),
         ),
       ],
@@ -892,6 +892,10 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
   // Ingredients, macros and allergy note for one dish.
   void _showDishDetails(String mealType, Map<String, dynamic> item) {
     final ingredients = (item['ingredients'] as List?) ?? const [];
+    final steps = [
+      for (final st in (item['steps'] as List?) ?? const []) st.toString(),
+    ];
+    final cookMinutes = (item['cook_minutes'] as num?)?.round() ?? 0;
     final allergen = (_goals['allergen'] as String? ?? '').trim();
     final hasAllergen = allergen.isNotEmpty && allergen.toLowerCase() != 'none';
 
@@ -1039,9 +1043,100 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                     ],
                   ),
                 ),
+            const SizedBox(height: 24),
+            _buildCookingGuide(steps, cookMinutes),
           ],
         ),
       ),
+    );
+  }
+
+  // Numbered cooking steps from the AI, with the total cooking time.
+  Widget _buildCookingGuide(List<String> steps, int cookMinutes) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              "HOW TO COOK",
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: textSecondary,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const Spacer(),
+            if (cookMinutes > 0)
+              Row(
+                children: [
+                  const Icon(
+                    Icons.schedule_rounded,
+                    size: 14,
+                    color: textSecondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    "$cookMinutes min",
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Plans made before cooking steps existed have none stored.
+        if (steps.isEmpty)
+          Text(
+            _isToday && !isSaved
+                ? "Regenerate this plan to get cooking steps."
+                : "Cooking steps are not available for this plan.",
+            style: const TextStyle(fontSize: 13, color: textSecondary),
+          )
+        else
+          for (var i = 0; i < steps.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 24,
+                    width: 24,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: brandGreen.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      "${i + 1}",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: brandGreen,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      steps[i],
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: textMain,
+                        height: 1.45,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+      ],
     );
   }
 
@@ -1134,6 +1229,21 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                         ),
                       ),
                     ),
+                    if (((item['cook_minutes'] as num?) ?? 0) > 0) ...[
+                      const Icon(
+                        Icons.schedule_rounded,
+                        size: 13,
+                        color: textSecondary,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        "${(item['cook_minutes'] as num).round()} min",
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: textSecondary,
+                        ),
+                      ),
+                    ],
                     const Icon(
                       Icons.chevron_right_rounded,
                       color: textSecondary,

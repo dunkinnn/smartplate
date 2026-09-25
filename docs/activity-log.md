@@ -347,3 +347,16 @@
 
 - `client/profile.dart`: streak pill in the header facts row wrapped in `FittedBox(scaleDown)`, fixing a 2.6 px right overflow on narrow screens.
 - Not committed.
+
+## 2026-09-25 - Cooking steps in Meal Plan
+
+- New `supabase/meal-plan-cooking-steps.sql`: `meal_plan_items.steps` (jsonb list) and `cook_minutes`.
+- Edge Function: AI returns 3-6 home-cook steps and total cooking time per dish (schema-enforced); stored capped at 8 steps of 300 characters and 0-240 minutes. Steps are included in the allergen and avoided-food check.
+- `meal_plan.dart`: dish sheet shows "HOW TO COOK" numbered steps with the cooking time; meal cards show the time next to each dish; header hint reads "Tap a dish for recipe". Older plans without steps show a note to regenerate.
+- Not committed.
+
+## 2026-09-25 - Plans appear only after "Use this plan"
+
+- `track.dart`, `grocery.dart`, `dashboard.dart`: meal plan queries add `saved_at is not null`, so Track's planned meals, the Grocery list and Home's Today's Meal Plan only show a plan once it is confirmed. Draft plans stay on Meal Plan only.
+- Empty-state text on Grocery and Home tells users to tap "Use this plan".
+- Not committed.
