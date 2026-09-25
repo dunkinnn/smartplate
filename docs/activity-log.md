@@ -332,3 +332,13 @@
 - One "plate" card holds the meal header and total, each staged food (with a remove button), an "Add custom food" link and protein/carbs/fat totals, replacing the separate empty state, food cards, custom button and macro card.
 - Save button reads "Save to Track".
 - Not committed.
+
+## 2026-09-25 - Log Nutrition calendar matches Track
+
+- `log_meal.dart`: calendar uses `visibleDays()` (signup-based week), equal-width days, "Today" label and the same card style as Track. Only today can be selected; other days are shown faded, since food is logged for today only.
+- Not committed.
+
+## 2026-09-25 - Future days not tappable
+
+- `meal_plan.dart`, `track.dart`: calendar days after today are faded and cannot be tapped; today and past days work as before.
+- Not committed.

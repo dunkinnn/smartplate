@@ -313,10 +313,14 @@ class _TrackScreenState extends State<TrackScreen> {
       children: days.map((date) {
         final isSelected = _dateKey(date) == _dateKey(selectedDate);
         final isToday = _dateKey(date) == _dateKey(today);
+        // Days after today cannot be opened yet.
+        final isFuture = _dateKey(date).compareTo(_dateKey(today)) > 0;
 
         return Expanded(
-          child: GestureDetector(
-            onTap: () {
+          child: Opacity(
+            opacity: isFuture ? 0.45 : 1,
+            child: GestureDetector(
+            onTap: isFuture ? null : () {
               setState(() => selectedDate = date);
               _loadDay();
             },
@@ -368,6 +372,7 @@ class _TrackScreenState extends State<TrackScreen> {
                 ),
               ],
             ),
+          ),
           ),
         );
       }).toList(),

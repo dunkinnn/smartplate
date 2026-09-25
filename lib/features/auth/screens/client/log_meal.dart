@@ -7,6 +7,7 @@ import 'package:smart_plate/features/auth/models/food_entry.dart';
 import 'package:smart_plate/features/auth/screens/client/custom_food.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 import 'package:smart_plate/features/auth/widgets/meal_badge.dart';
+import 'package:smart_plate/features/auth/services/calendar_days.dart';
 
 class LogMealScreen extends StatefulWidget {
   final DateTime? initialDate;
@@ -248,68 +249,85 @@ class _LogMealScreenState extends State<LogMealScreen> {
   }
 
   // Rolling week ending today, so the dates are always current.
+  String _dateKey(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
+  // Same week and look as Track; only today can be picked, since food is
+  // logged for today only.
   Widget _buildHorizontalCalendar() {
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const borderColor = Color(0xFFE2E8F0);
     final today = DateTime.now();
-    final days = List.generate(
-      7,
-      (i) => DateTime(today.year, today.month, today.day - (6 - i)),
-    );
+    final days = visibleDays();
 
+    // Each day takes an equal share of the width, so it fits any screen size.
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: days.map((date) {
-        final isSelected =
-            date.year == selectedDate.year &&
-            date.month == selectedDate.month &&
-            date.day == selectedDate.day;
+        final isSelected = _dateKey(date) == _dateKey(selectedDate);
+        final isToday = _dateKey(date) == _dateKey(today);
 
-        return GestureDetector(
-          onTap: () => setState(() => selectedDate = date),
-          child: Column(
-            children: [
-              Text(
-                dayNames[date.weekday - 1],
-                style: TextStyle(
-                  color: isSelected ? darkBlue : textSecondary,
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-              const SizedBox(height: 10),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected ? brandGreen : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: brandGreen.withValues(alpha: 0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : [],
-                ),
-                child: Text(
-                  '${date.day}',
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : textSecondary,
-                    fontWeight: FontWeight.w700,
+        return Expanded(
+          child: Opacity(
+            opacity: isToday || isSelected ? 1 : 0.45,
+            child: GestureDetector(
+              onTap: isToday ? () => setState(() => selectedDate = date) : null,
+              child: Column(
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      isToday ? 'Today' : dayNames[date.weekday - 1],
+                      style: TextStyle(
+                        color: isSelected ? darkBlue : textSecondary,
+                        fontSize: 12,
+                        fontWeight: isSelected
+                            ? FontWeight.w800
+                            : FontWeight.normal,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 10),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isSelected ? brandGreen : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected ? brandGreen : borderColor,
+                        width: 1,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: brandGreen.withValues(alpha: 0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ]
+                          : [],
+                    ),
+                    child: Text(
+                      '${date.day}',
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : darkBlue,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       }).toList(),
     );
   }
+
 
   Widget _buildLabel(String text) {
     return Padding(
