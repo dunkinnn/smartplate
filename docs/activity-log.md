@@ -280,3 +280,10 @@
 
 - `meal_plan.dart`: an orange info note ("Always check ingredients and labels if you have a severe allergy...") appears under the meal plan and in each dish's details sheet.
 - Not committed.
+
+## 2026-09-25 - White launch screen, no system logo
+
+- `values-night/styles.xml`: launch and normal themes use the light parent, so dark mode no longer shows a black screen at launch.
+- `drawable-v21/launch_background.xml`: plain white background.
+- New `values-v31/styles.xml`, `values-night-v31/styles.xml` and `drawable/splash_transparent.xml`: Android 12+ system splash is white with an empty icon, so only the animated Flutter intro shows the logo.
+- Not committed.
