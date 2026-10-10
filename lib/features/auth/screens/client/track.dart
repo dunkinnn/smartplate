@@ -453,14 +453,19 @@ class _TrackScreenState extends State<TrackScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                Text(
-                  remaining != null
-                      ? "${_formatNumber(remaining.abs())} kcal"
-                      : "No goal set",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
+                // Shrinks on narrow screens so the number stays on one line.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    remaining != null
+                        ? "${_formatNumber(remaining.abs())} kcal"
+                        : "No goal set",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -517,7 +522,13 @@ class _TrackScreenState extends State<TrackScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        // Wraps on narrow screens instead of overflowing.
+        SizedBox(
+          width: double.infinity,
+          child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          spacing: 8,
+          runSpacing: 4,
           children: [
             Text(
               "$eaten of ${meals.length} planned meals eaten",
@@ -527,12 +538,12 @@ class _TrackScreenState extends State<TrackScreen> {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const Spacer(),
             Text(
               "Plan ${_formatNumber(_plannedKcal)} kcal",
               style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
           ],
+          ),
         ),
         const SizedBox(height: 8),
         Row(

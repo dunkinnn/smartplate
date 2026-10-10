@@ -53,9 +53,14 @@ class _PlanConfirmedScreenState extends State<PlanConfirmedScreen>
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
+        // Scrolls on short screens; otherwise fills the height so Spacers still centre.
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
             children: [
               const Spacer(),
               ScaleTransition(
@@ -177,6 +182,9 @@ class _PlanConfirmedScreenState extends State<PlanConfirmedScreen>
               ),
               const SizedBox(height: 12),
             ],
+                ),
+              ),
+            ),
           ),
         ),
       ),

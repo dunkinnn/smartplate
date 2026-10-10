@@ -225,52 +225,71 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 10),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: Checkbox(
-                          value: _savePassword,
-                          activeColor: brandGreen,
-                          onChanged: (value) {
-                            setState(() {
-                              _savePassword = value!;
-                            });
-                          },
-                        ),
+              // One line; the whole row (checkbox, Save Password and Forgot
+              // Password) shrinks together on narrow screens instead of overflowing.
+              LayoutBuilder(
+                builder: (context, constraints) => SizedBox(
+                  width: constraints.maxWidth,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minWidth: constraints.maxWidth,
                       ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        "Save Password",
-                        style: TextStyle(
-                          color: brandGreen,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ForgotPasswordScreen(),
-                        ),
-                      );
-                    },
-                    child: const Text(
-                      "Forgot Password",
-                      style: TextStyle(
-                        color: brandGreen,
-                        fontWeight: FontWeight.w600,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: Checkbox(
+                                  value: _savePassword,
+                                  activeColor: brandGreen,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _savePassword = value!;
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                "Save Password",
+                                style: TextStyle(
+                                  color: brandGreen,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const ForgotPasswordScreen(),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              "Forgot Password",
+                              style: TextStyle(
+                                color: brandGreen,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
 
               const SizedBox(height: 25),
@@ -302,8 +321,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 20),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              // One line; shrinks together on narrow screens instead of wrapping.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
                     "Don't have an account? ",
@@ -330,6 +352,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ],
+                ),
               ),
             ],
           ),

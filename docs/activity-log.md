@@ -372,3 +372,13 @@
 - New `widgets/connection_banner.dart`: wraps the app (in `main.dart` builder) and shows a red "No internet connection. Check your Wi-Fi or mobile data." banner with Retry at the top of every screen while offline. Checks by resolving supabase.co every 15 s (every 4 s while offline) and when the app resumes.
 - `android/app/src/main/AndroidManifest.xml`: added the INTERNET permission. It was only in the debug and profile manifests, so release APKs could not reach Supabase or OpenAI.
 - Not committed.
+
+## 2026-10-10 - Password eye icon and responsiveness fixes
+
+- `login.dart`, `signup.dart`: eye icon toggles password visibility; it only appears once the field has text. Signup password and confirm fields toggle separately.
+- `login.dart`: "Save Password / Forgot Password" stay on one row and shrink together to fit on narrow phones; the sign-up link and the log-in link in `signup.dart` also stay on one line and shrink to fit.
+- `track.dart`: "planned meals eaten / Plan kcal" row wraps instead of overflowing; the remaining-kcal number scales down to stay on one line.
+- `log_meal.dart`: long saved-food names in the Recent/Matches chips are cut with an ellipsis instead of overflowing.
+- `meal_plan.dart`: Regenerate / Use this plan labels scale down instead of breaking mid-word; long ingredient amounts wrap.
+- `plan_confirmed.dart`: scrolls on short screens or landscape instead of overflowing, layout unchanged on tall screens.
+- Not committed.

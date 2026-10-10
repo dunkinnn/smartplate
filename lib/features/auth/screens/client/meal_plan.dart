@@ -586,9 +586,13 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                 ),
               )
             : const Icon(Icons.check_rounded, size: 18),
-        label: Text(
-          isSaving ? "Saving..." : "Use this plan",
-          style: const TextStyle(fontWeight: FontWeight.w800),
+        // Scales down rather than breaking mid-word on narrow screens.
+        label: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            isSaving ? "Saving..." : "Use this plan",
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: brandGreen,
@@ -618,11 +622,14 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                 ),
               )
             : const Icon(Icons.refresh_rounded, size: 18, color: brandGreen),
-        label: Text(
-          isGenerating ? "Generating..." : "Regenerate",
-          style: const TextStyle(
-            color: brandGreen,
-            fontWeight: FontWeight.w800,
+        label: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            isGenerating ? "Generating..." : "Regenerate",
+            style: const TextStyle(
+              color: brandGreen,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
         style: OutlinedButton.styleFrom(
@@ -1033,11 +1040,16 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                           ),
                         ),
                       ),
-                      Text(
-                        raw['quantity'] as String? ?? '',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: textSecondary,
+                      const SizedBox(width: 12),
+                      // Long amounts wrap instead of pushing past the edge.
+                      Flexible(
+                        child: Text(
+                          raw['quantity'] as String? ?? '',
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: textSecondary,
+                          ),
                         ),
                       ),
                     ],

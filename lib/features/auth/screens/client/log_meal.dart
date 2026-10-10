@@ -507,12 +507,17 @@ class _LogMealScreenState extends State<LogMealScreen> {
                             color: brandGreen,
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            food.name,
-                            style: const TextStyle(
-                              color: darkBlue,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
+                          // Long names are cut with an ellipsis instead of overflowing.
+                          Flexible(
+                            child: Text(
+                              food.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: darkBlue,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 6),

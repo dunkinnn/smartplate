@@ -320,8 +320,11 @@ class _SignupScreenState extends State<SignupScreen> {
 
                 const SizedBox(height: 20),
 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                // One line; shrinks together on narrow screens instead of wrapping.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     const Text(
                       'Already have an account? ',
@@ -348,6 +351,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                   ],
+                  ),
                 ),
 
                 const SizedBox(height: 30),
