@@ -385,6 +385,8 @@ Deno.serve(async (req) => {
     .from('ai_usage')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', user.id)
+    // Only plan generations count, so food estimates never use up this limit.
+    .eq('feature', 'meal_plan')
     .gte('created_at', `${manilaDay}T00:00:00+08:00`);
 
   if (usageError) return json({ error: usageError.message }, 500);

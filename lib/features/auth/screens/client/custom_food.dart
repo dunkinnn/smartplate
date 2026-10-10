@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:smart_plate/features/auth/widgets/notification_bell.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/models/food_entry.dart';
+import 'package:smart_plate/features/auth/models/nutrients.dart';
+import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 
 class CustomFoodScreen extends StatefulWidget {
@@ -26,11 +28,90 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
 
   bool _saveToLibrary = true;
   bool _isSaving = false;
+  bool _isEstimating = false;
+
+  // Sugar, fiber and the rest from the last AI estimate, keyed by column.
+  Map<String, double> _extra = {};
+
+  // Name and amount the current estimate was made for.
+  String? _estimatedFor;
 
   // Inline message shown above the buttons instead of a snackbar.
   String? _message;
   bool _messageIsError = true;
   bool _libraryFailed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Rebuilds so the "estimate again" hint appears as soon as the input changes.
+    nameController.addListener(() => setState(() {}));
+    quantityController.addListener(() => setState(() {}));
+  }
+
+  String get _inputKey =>
+      '${nameController.text.trim().toLowerCase()}|${quantityController.text.trim().toLowerCase()}';
+
+  // True when the food or amount changed after the last estimate.
+  bool get _isStale => _estimatedFor != null && _estimatedFor != _inputKey;
+
+  // Asks the estimate-food Edge Function and fills the editable fields.
+  Future<void> _estimate() async {
+    if (_isEstimating) return;
+    FocusScope.of(context).unfocus();
+
+    if (nameController.text.trim().isEmpty) {
+      setState(() {
+        _message = 'Enter a food name first.';
+        _messageIsError = true;
+      });
+      return;
+    }
+
+    setState(() {
+      _isEstimating = true;
+      _message = null;
+    });
+
+    try {
+      final response = await Supabase.instance.client.functions
+          .invoke(
+            'estimate-food',
+            body: {
+              'name': nameController.text.trim(),
+              'quantity': quantityController.text.trim(),
+            },
+          )
+          .timeout(const Duration(seconds: 30));
+
+      final data = response.data;
+      if (data is! Map) throw Exception('Could not estimate this food.');
+      if (data['error'] != null) throw Exception(data['error']);
+
+      double value(String key) => (data[key] as num?)?.toDouble() ?? 0;
+      String fmt(double v) =>
+          v % 1 == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+
+      if (!mounted) return;
+      setState(() {
+        caloriesController.text = fmt(value('kcal'));
+        proteinController.text = fmt(value('protein_g'));
+        carbsController.text = fmt(value('carbs_g'));
+        fatController.text = fmt(value('fat_g'));
+        _extra = {for (final n in Nutrient.all) n.column: value(n.column)};
+        _estimatedFor = _inputKey;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _message = friendlyError(e);
+          _messageIsError = true;
+        });
+      }
+    }
+
+    if (mounted) setState(() => _isEstimating = false);
+  }
 
   @override
   void dispose() {
@@ -55,13 +136,18 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
 
     if (name.isEmpty || kcal <= 0) {
       setState(() {
-        _message = 'Enter a food name and its calories.';
+        _message = name.isEmpty
+            ? 'Enter a food name first.'
+            : 'Tap Estimate with AI, or enter the calories yourself.';
         _messageIsError = true;
       });
       return;
     }
 
     setState(() => _message = null);
+
+    // Extra nutrients are dropped if they belong to a different food or amount.
+    final extra = _isStale ? const <String, double>{} : _extra;
 
     final food = FoodEntry(
       name: name,
@@ -70,6 +156,11 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
       proteinG: _parseNumber(proteinController.text),
       carbsG: _parseNumber(carbsController.text),
       fatG: _parseNumber(fatController.text),
+      sugarG: extra['sugar_g'] ?? 0,
+      fiberG: extra['fiber_g'] ?? 0,
+      saturatedFatG: extra['saturated_fat_g'] ?? 0,
+      sodiumMg: extra['sodium_mg'] ?? 0,
+      cholesterolMg: extra['cholesterol_mg'] ?? 0,
     );
 
     if (_saveToLibrary && !_libraryFailed) {
@@ -109,6 +200,11 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
         'protein_g': food.proteinG,
         'carbs_g': food.carbsG,
         'fat_g': food.fatG,
+        'sugar_g': food.sugarG,
+        'fiber_g': food.fiberG,
+        'saturated_fat_g': food.saturatedFatG,
+        'sodium_mg': food.sodiumMg,
+        'cholesterol_mg': food.cholesterolMg,
         'last_used_at': DateTime.now().toIso8601String(),
       }, onConflict: 'user_id,name');
       return true;
@@ -132,61 +228,72 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(height: GlassHeader.insetFor(context) + 25),
-                _buildSectionHeader("BASIC INFORMATION"),
+                _buildSectionHeader("FOOD"),
                 _buildInputField(
                   "Food Name",
-                  "e.g. Homemade Pancake",
+                  "e.g. Chicken adobo",
                   Icons.restaurant_menu_rounded,
                   nameController,
                 ),
                 const SizedBox(height: 20),
+                _buildInputField(
+                  "Amount",
+                  "e.g. 150 g",
+                  Icons.scale_rounded,
+                  quantityController,
+                ),
+                const SizedBox(height: 20),
+                _buildEstimateButton(),
+                const SizedBox(height: 35),
+                _buildSectionHeader("NUTRITION (EDIT IF NEEDED)"),
                 Row(
                   children: [
                     Expanded(
                       child: _buildInputField(
-                        "Quantity",
-                        "100g",
-                        Icons.scale_rounded,
-                        quantityController,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildInputField(
                         "Calories",
-                        "220 kcal",
+                        "kcal",
                         Icons.local_fire_department_rounded,
                         caloriesController,
                         isNumeric: true,
                       ),
                     ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildInputField(
+                        "Protein",
+                        "g",
+                        Icons.fitness_center_rounded,
+                        proteinController,
+                        isNumeric: true,
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 35),
-                _buildSectionHeader("MACRONUTRIENTS (OPTIONAL)"),
-                _buildInputField(
-                  "Protein",
-                  "0g",
-                  Icons.fitness_center_rounded,
-                  proteinController,
-                  isNumeric: true,
-                ),
                 const SizedBox(height: 16),
-                _buildInputField(
-                  "Carbohydrates",
-                  "0g",
-                  Icons.bakery_dining_rounded,
-                  carbsController,
-                  isNumeric: true,
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildInputField(
+                        "Carbs",
+                        "g",
+                        Icons.bakery_dining_rounded,
+                        carbsController,
+                        isNumeric: true,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildInputField(
+                        "Fat",
+                        "g",
+                        Icons.water_drop_rounded,
+                        fatController,
+                        isNumeric: true,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                _buildInputField(
-                  "Fats",
-                  "0g",
-                  Icons.water_drop_rounded,
-                  fatController,
-                  isNumeric: true,
-                ),
+                _buildExtraNutrients(),
                 const SizedBox(height: 24),
                 _buildSaveToLibraryToggle(),
                 _buildMessageBanner(),
@@ -218,11 +325,110 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
           const Expanded(
             child: HeaderTitle(
               title: "Custom Food",
-              subtitle: "Add your own recipe",
+              subtitle: "AI fills in the nutrition",
             ),
           ),
           const NotificationBell(),
           const SizedBox(width: 8), // Balances the leading spacer
+        ],
+      ),
+    );
+  }
+
+  // Fills the nutrition fields from the food name and amount.
+  Widget _buildEstimateButton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: OutlinedButton.icon(
+            onPressed: _isEstimating ? null : _estimate,
+            icon: _isEstimating
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(
+                      color: brandGreen,
+                      strokeWidth: 2.5,
+                    ),
+                  )
+                : const Icon(Icons.auto_awesome_rounded, size: 18),
+            label: Text(
+              _isEstimating
+                  ? "Estimating..."
+                  : _estimatedFor == null
+                  ? "Estimate with AI"
+                  : "Estimate again",
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: brandGreen,
+              side: BorderSide(
+                color: brandGreen.withValues(alpha: 0.5),
+                width: 1.5,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 8, left: 4),
+          child: Text(
+            _isStale
+                ? "Food or amount changed. Estimate again to update the values."
+                : "Values are AI estimates. Edit them if you have a food label.",
+            style: TextStyle(
+              fontSize: 11,
+              color: _isStale ? Colors.orange : textSecondary,
+              fontWeight: _isStale ? FontWeight.w700 : FontWeight.w400,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Sugar, fiber and the rest from the estimate, shown read-only.
+  Widget _buildExtraNutrients() {
+    if (_extra.isEmpty || _isStale) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: fieldBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          for (final n in Nutrient.all)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      n.label,
+                      style: const TextStyle(fontSize: 13, color: darkBlue),
+                    ),
+                  ),
+                  Text(
+                    n.format(_extra[n.column] ?? 0),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: darkBlue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

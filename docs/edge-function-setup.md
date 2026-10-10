@@ -41,6 +41,19 @@ supabase functions deploy generate-meal-plan
 `SUPABASE_URL` and `SUPABASE_ANON_KEY` are injected automatically, so only the
 model key needs setting.
 
+### estimate-food
+
+Custom Food uses a second function to estimate calories, macros and nutrients.
+Run `supabase/custom-foods-extra-nutrients.sql` in the SQL editor first, then:
+
+```
+supabase functions deploy estimate-food
+```
+
+It reuses `OPENAI_API_KEY` and `OPENAI_MODEL`. Each user gets 20 estimates per
+Manila day, counted separately from meal plans; change it with
+`supabase secrets set FOOD_ESTIMATE_LIMIT=30` (0 turns it off).
+
 ## 6. Check the logs when something fails
 
 Open the function's Logs tab in the dashboard:

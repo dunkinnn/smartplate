@@ -382,3 +382,12 @@
 - `meal_plan.dart`: Regenerate / Use this plan labels scale down instead of breaking mid-word; long ingredient amounts wrap.
 - `plan_confirmed.dart`: scrolls on short screens or landscape instead of overflowing, layout unchanged on tall screens.
 - Not committed.
+
+## 2026-10-10 - AI estimate on Custom Food
+
+- New Edge Function `supabase/functions/estimate-food`: takes a food name and amount, returns kcal, macros, sugar, fiber, saturated fat, sodium and cholesterol (strict JSON schema, values clamped). Rejects non-food text. 20 estimates per user per Manila day (`FOOD_ESTIMATE_LIMIT`), logged in `ai_usage` as `food_estimate`.
+- `generate-meal-plan`: daily limit now counts only `meal_plan` rows, so food estimates do not use up plan generations.
+- New `supabase/custom-foods-extra-nutrients.sql`: adds the five extra nutrient columns to `custom_foods`.
+- `custom_food.dart`: user enters food and amount, taps "Estimate with AI"; calories and macros fill editable fields, extra nutrients show read-only. Changing the food or amount after estimating shows an "estimate again" hint and drops the stale extra nutrients. Extra nutrients are saved to the library and the logged food.
+- `edge-function-setup.md`: deploy steps for `estimate-food`.
+- Not deployed, not committed.
