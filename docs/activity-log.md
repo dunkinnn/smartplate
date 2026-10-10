@@ -391,3 +391,8 @@
 - `custom_food.dart`: user enters food and amount, taps "Estimate with AI"; calories and macros fill editable fields, extra nutrients show read-only. Changing the food or amount after estimating shows an "estimate again" hint and drops the stale extra nutrients. Extra nutrients are saved to the library and the logged food.
 - `edge-function-setup.md`: deploy steps for `estimate-food`.
 - Not deployed, not committed.
+
+## 2026-10-10 - Legal screen Accept button
+
+- `legal.dart`: Accept button sits in a white bar with a top divider, full width, with consistent padding above the phone's navigation area instead of sitting flush on it.
+- Not committed.

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 // lines: the first is the intro, the last is the footer, and each block in
 // between starts with its heading line.
 const termsOfServiceText = '''
-Smart Plate ("the Application") is operated by Jenalyn Pagauitan and Jemimah Jimenez (the "Service Provider"). By using the app you agree to these Terms.
+Smart Plate is operated by Jenalyn Pagauitan and Jemimah Jimenez. By using the app you agree to these Terms.
 
 License
 The Application is distributed as open source software under its applicable license.
@@ -38,7 +38,7 @@ Effective 2026-07-29. Full terms: terms-of-service.md. Contact: smartplate@gmail
 ''';
 
 const privacyPolicyText = '''
-This policy applies to the Smart Plate app, operated by Jenalyn Pagauitan and Jemimah Jimenez (the "Service Provider").
+This policy applies to the Smart Plate app, operated by Jenalyn Pagauitan and Jemimah Jimenez.
 
 Information Collected
 Device IP address, pages visited and time spent in the app, and your mobile operating system.
@@ -69,7 +69,6 @@ The Service Provider may update this policy and will notify you of material chan
 
 Effective 2026-07-29. Full policy: privacy-policy.md. Contact: smartplate@gmail.com
 ''';
-
 
 // One heading and its paragraph from the legal text.
 class _LegalSection {
@@ -127,8 +126,18 @@ class LegalScreen extends StatelessWidget {
     final m = RegExp(r'Effective (\d{4})-(\d{2})-(\d{2})').firstMatch(_footer);
     if (m == null) return null;
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June', 'July',
-      'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     return '${months[int.parse(m.group(2)!) - 1]} ${int.parse(m.group(3)!)}, ${m.group(1)}';
   }
@@ -307,24 +316,38 @@ class LegalScreen extends StatelessWidget {
             ),
         ],
       ),
+      // Pinned bar with a divider, padded above the system navigation area.
       bottomNavigationBar: showAccept
-          ? SafeArea(
-              minimum: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-              child: SizedBox(
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: brandGreen,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+          ? Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: borderColor)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: brandGreen,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Accept',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    'Accept',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
