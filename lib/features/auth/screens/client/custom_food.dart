@@ -101,7 +101,9 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
         _extra = {for (final n in Nutrient.all) n.column: value(n.column)};
         _estimatedFor = _inputKey;
       });
+    // Error: nutrition estimate for the custom food failed (Custom Food).
     } catch (e) {
+      debugPrint('[Custom Food] Failed to estimate nutrition: $e');
       if (mounted) {
         setState(() {
           _message = friendlyError(e);
@@ -208,8 +210,9 @@ class _CustomFoodScreenState extends State<CustomFoodScreen> {
         'last_used_at': DateTime.now().toIso8601String(),
       }, onConflict: 'user_id,name');
       return true;
+    // Error: custom food could not be saved to the custom_foods table (Custom Food).
     } catch (e) {
-      debugPrint('Failed to save custom food: $e');
+      debugPrint('[Custom Food] Failed to save custom food: $e');
       return false;
     }
   }

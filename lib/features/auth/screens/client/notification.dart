@@ -141,8 +141,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
         _notifications = _buildNotifications(logs as List, profile);
         _isLoading = false;
       });
+    // Error: notifications list could not be loaded (Notifications).
     } catch (e) {
-      debugPrint('Failed to load notifications: $e');
+      debugPrint('[Notifications] Failed to load notifications: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;

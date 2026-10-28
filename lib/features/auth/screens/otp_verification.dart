@@ -76,6 +76,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           );
         }
       }
+    // Error: Supabase Auth rejected the OTP code (OTP Verification).
     } on AuthException catch (e) {
       if (mounted) {
         // Increment attempt counter
@@ -112,12 +113,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           }
         });
       }
-      debugPrint('AuthException in OTP verify: ${e.message}');
+      debugPrint('[OTP Verification] AuthException in OTP verify: ${e.message}');
+    // Error: OTP verification failed, likely a network problem (OTP Verification).
     } catch (e) {
       if (mounted) {
         setState(() => _authMessage = 'Network error. Please try again.');
       }
-      debugPrint('Error verifying OTP: $e');
+      debugPrint('[OTP Verification] Error verifying OTP: $e');
     }
 
     if (mounted) setState(() => isLoading = false);
@@ -167,18 +169,20 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           }
         }
       }
+    // Error: Supabase Auth rejected resending the OTP (OTP Verification).
     } on AuthException catch (e) {
       if (mounted) {
         setState(() {
           _authMessage = friendlyError(e);
         });
       }
-      debugPrint('Error resending OTP: ${e.message}');
+      debugPrint('[OTP Verification] Error resending OTP: ${e.message}');
+    // Error: resending the OTP failed, likely a network problem (OTP Verification).
     } catch (e) {
       if (mounted) {
         setState(() => _authMessage = 'Network error. Please try again.');
       }
-      debugPrint('Error resending OTP: $e');
+      debugPrint('[OTP Verification] Error resending OTP: $e');
     }
 
     if (mounted) setState(() => isLoading = false);

@@ -97,8 +97,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _loggedToday = loggedToday;
         _loggedDays = days;
       });
+    // Error: streak could not be loaded from meal_logs (Dashboard).
     } catch (e) {
-      debugPrint('Failed to load streak: $e');
+      debugPrint('[Dashboard] Failed to load streak: $e');
     }
   }
 
@@ -148,8 +149,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       if (!mounted) return;
       setState(() => _todayPlan = sorted);
+    // Error: today's meal plan could not be loaded (Dashboard).
     } catch (e) {
-      debugPrint('Failed to load today\'s plan: $e');
+      debugPrint('[Dashboard] Failed to load today\'s plan: $e');
     }
   }
 
@@ -182,8 +184,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _mealsLogged = meals.length;
         _eatenPlanMeals = eatenPlan;
       });
+    // Error: today's food logs could not be loaded (Dashboard).
     } catch (e) {
-      debugPrint('Failed to load today\'s logs: $e');
+      debugPrint('[Dashboard] Failed to load today\'s logs: $e');
     }
   }
 
@@ -221,8 +224,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _calorieTarget = (row?['calorie_target'] as num?)?.round();
         _isLoadingProfile = false;
       });
+    // Error: user profile could not be loaded from user_profiles (Dashboard).
     } catch (e) {
-      debugPrint('Failed to load profile: $e');
+      debugPrint('[Dashboard] Failed to load profile: $e');
       if (mounted) {
         setState(() {
           _fullName = user.userMetadata?['full_name'] as String?;

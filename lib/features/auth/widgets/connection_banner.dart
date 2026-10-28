@@ -56,6 +56,7 @@ class _ConnectionBannerState extends State<ConnectionBanner>
         _host,
       ).timeout(const Duration(seconds: 5));
       online = result.isNotEmpty && result.first.rawAddress.isNotEmpty;
+    // Error: device is offline or the internet check timed out (ConnectionBanner).
     } catch (_) {
       online = false;
     }

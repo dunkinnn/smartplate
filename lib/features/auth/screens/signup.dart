@@ -158,11 +158,15 @@ class _SignupScreenState extends State<SignupScreen> {
           MaterialPageRoute(builder: (context) => const ProfileScreen()),
         );
       }
+    // Error: Supabase Auth rejected the signup, such as an email already in use (Signup).
     } on AuthException catch (e) {
+      debugPrint('[Signup] Signup rejected: $e');
       if (mounted) {
         setState(() => _emailError = friendlyError(e));
       }
+    // Error: signup failed, likely a network problem (Signup).
     } catch (e) {
+      debugPrint('[Signup] Signup failed: $e');
       if (mounted) {
         setState(() => _emailError = friendlyError(e));
       }

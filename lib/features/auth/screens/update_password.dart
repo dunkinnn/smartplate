@@ -87,11 +87,15 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
           );
         }
       }
+    // Error: Supabase Auth rejected the new password (Update Password).
     } on AuthException catch (e) {
+      debugPrint('[Update Password] Password update rejected: $e');
       if (mounted) {
         setState(() => _authError = friendlyError(e));
       }
+    // Error: password update failed, likely a network problem (Update Password).
     } catch (e) {
+      debugPrint('[Update Password] Password update failed: $e');
       if (mounted) {
         setState(() => _authError = friendlyError(e));
       }

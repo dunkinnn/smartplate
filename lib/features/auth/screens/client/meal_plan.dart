@@ -149,8 +149,9 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         totalKcal = (plan['total_kcal'] as num?)?.round() ?? 0;
         isLoading = false;
       });
+    // Error: meal plan could not be loaded (Meal Plan).
     } catch (e) {
-      debugPrint('Failed to load meal plan: $e');
+      debugPrint('[Meal Plan] Failed to load meal plan: $e');
       if (mounted) setState(() => isLoading = false);
     }
   }
@@ -175,7 +176,9 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
       }
 
       await _loadPlan();
+    // Error: AI meal plan generation failed in the generate-meal-plan function (Meal Plan).
     } catch (e) {
+      debugPrint('[Meal Plan] Failed to generate meal plan: $e');
       // Covers function errors (e.g. the daily limit) and network failures.
       if (mounted) setState(() => _message = friendlyError(e));
     }
@@ -221,8 +224,9 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
           ),
         );
       }
+    // Error: meal plan could not be confirmed (Meal Plan).
     } catch (e) {
-      debugPrint('Failed to confirm meal plan: $e');
+      debugPrint('[Meal Plan] Failed to confirm meal plan: $e');
       if (mounted) setState(() => _message = 'Could not confirm your plan.');
     }
 

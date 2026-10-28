@@ -73,7 +73,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         _avatarUrl = row?['avatar_url'] as String?;
         _isLoading = false;
       });
+    // Error: personal details could not be loaded (Personal Info).
     } catch (e) {
+      debugPrint('[Personal Info] Failed to load details: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -187,14 +189,18 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         _message = 'Details saved.';
         _messageIsError = false;
       });
+    // Error: database rejected saving the personal details (Personal Info).
     } on PostgrestException catch (e) {
+      debugPrint('[Personal Info] Database error saving details: $e');
       if (!mounted) return;
       setState(() {
         _isSaving = false;
         _message = friendlyError(e);
         _messageIsError = true;
       });
+    // Error: profile photo upload or save failed (Personal Info).
     } catch (e) {
+      debugPrint('[Personal Info] Failed to save photo: $e');
       if (!mounted) return;
       setState(() {
         _isSaving = false;

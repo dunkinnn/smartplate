@@ -70,8 +70,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
       );
+    // Error: logging out failed (Profile).
     } catch (e) {
-      debugPrint('Failed to log out: $e');
+      debugPrint('[Profile] Failed to log out: $e');
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
       setState(() => _isLoggingOut = false);
@@ -124,8 +125,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final streak = await MealLogService.currentStreak();
       if (mounted) setState(() => _streak = streak);
+    // Error: streak could not be loaded from meal_logs (Profile).
     } catch (e) {
-      debugPrint('Failed to load streak: $e');
+      debugPrint('[Profile] Failed to load streak: $e');
     }
   }
 
@@ -158,8 +160,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           });
         }
       }
+    // Error: profile data could not be loaded from user_profiles (Profile).
     } catch (e) {
-      debugPrint("Error fetching profile data: $e");
+      debugPrint("[Profile] Error fetching profile data: $e");
       // Silently fail - we already have user email from auth
     }
   }

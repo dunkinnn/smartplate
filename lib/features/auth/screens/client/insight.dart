@@ -49,8 +49,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
     try {
       final streak = await MealLogService.currentStreak();
       if (mounted) setState(() => _streak = streak);
+    // Error: streak could not be loaded from meal_logs (Insights).
     } catch (e) {
-      debugPrint('Failed to load streak: $e');
+      debugPrint('[Insights] Failed to load streak: $e');
     }
   }
 
@@ -133,8 +134,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
         _fatGoal = (profile?['fat_goal_g'] as num?)?.toDouble();
         _isLoading = false;
       });
+    // Error: weekly insights data could not be loaded (Insights).
     } catch (e) {
-      debugPrint('Failed to load insights: $e');
+      debugPrint('[Insights] Failed to load insights: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;

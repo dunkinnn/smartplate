@@ -87,7 +87,9 @@ class _SecurityScreenState extends State<SecurityScreen> {
         _message = 'Password updated.';
         _messageIsError = false;
       });
+    // Error: password change was rejected by Supabase Auth (Security).
     } on AuthException catch (e) {
+      debugPrint('[Security] Failed to update password: $e');
       if (!mounted) return;
       setState(() {
         _isSaving = false;

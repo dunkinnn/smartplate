@@ -172,8 +172,9 @@ class _GroceryScreenState extends State<GroceryScreen> {
         _hasPlan = true;
         _isLoading = false;
       });
+    // Error: grocery list could not be loaded (Grocery).
     } catch (e) {
-      debugPrint('Failed to load grocery list: $e');
+      debugPrint('[Grocery] Failed to load grocery list: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -301,8 +302,9 @@ class _GroceryScreenState extends State<GroceryScreen> {
           if (!bought) _showBought.clear();
         });
       }
+    // Error: marking all grocery items failed (Grocery).
     } catch (e) {
-      debugPrint('Failed to update grocery list: $e');
+      debugPrint('[Grocery] Failed to update grocery list: $e');
     }
     if (mounted) setState(() => _isUpdatingAll = false);
   }
@@ -316,8 +318,9 @@ class _GroceryScreenState extends State<GroceryScreen> {
           .from('grocery_items')
           .update({'is_checked': value})
           .inFilter('id', item.ids);
+    // Error: checking or unchecking a grocery item failed (Grocery).
     } catch (e) {
-      debugPrint('Failed to update item: $e');
+      debugPrint('[Grocery] Failed to update item: $e');
       if (mounted) setState(() => item.isBought = !value);
     }
   }

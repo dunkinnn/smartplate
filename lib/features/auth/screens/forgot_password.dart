@@ -116,6 +116,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           );
         }
       }
+    // Error: Supabase Auth rejected sending the reset code (Forgot Password).
     } on AuthException catch (e) {
       if (mounted) {
         // Increment email attempts on auth error
@@ -142,14 +143,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           }
         });
       }
-      debugPrint('AuthException: ${e.message}');
+      debugPrint('[Forgot Password] AuthException: ${e.message}');
+    // Error: sending the reset code failed, likely a network problem (Forgot Password).
     } catch (e) {
       if (mounted) {
         setState(() {
           _authMessage = 'Network error. Check your connection and try again.';
         });
       }
-      debugPrint('Error sending OTP: $e');
+      debugPrint('[Forgot Password] Error sending OTP: $e');
     }
 
     if (mounted) setState(() => isLoading = false);

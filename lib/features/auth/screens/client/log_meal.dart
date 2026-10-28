@@ -83,8 +83,9 @@ class _LogMealScreenState extends State<LogMealScreen> {
             .toList();
         _isSearching = false;
       });
+    // Error: saved foods could not be loaded from custom_foods (Log Meal).
     } catch (e) {
-      debugPrint('Failed to load saved foods: $e');
+      debugPrint('[Log Meal] Failed to load saved foods: $e');
       if (mounted) setState(() => _isSearching = false);
     }
   }
@@ -103,8 +104,9 @@ class _LogMealScreenState extends State<LogMealScreen> {
           .from('custom_foods')
           .update({'last_used_at': DateTime.now().toIso8601String()})
           .eq('id', food.id!);
+    // Error: last used date of a saved food could not be updated (Log Meal).
     } catch (e) {
-      debugPrint('Failed to bump food: $e');
+      debugPrint('[Log Meal] Failed to bump food: $e');
     }
   }
 
@@ -173,9 +175,13 @@ class _LogMealScreenState extends State<LogMealScreen> {
 
       AlertService.update();
       if (mounted) Navigator.pop(context, true);
+    // Error: database rejected the meal log when saving (Log Meal).
     } on PostgrestException catch (e) {
+      debugPrint('[Log Meal] Database error saving meal log: $e');
       if (mounted) _showMessage(friendlyError(e));
+    // Error: meal log could not be saved, likely a network problem (Log Meal).
     } catch (e) {
+      debugPrint('[Log Meal] Failed to save meal log: $e');
       if (mounted) _showMessage(friendlyError(e));
     }
 

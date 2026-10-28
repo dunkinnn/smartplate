@@ -25,8 +25,9 @@ class _NotificationBellState extends State<NotificationBell> {
     try {
       final count = await unreadNotificationCount();
       if (mounted) setState(() => _unread = count);
+    // Error: unread notification count could not be loaded (NotificationBell).
     } catch (e) {
-      debugPrint('Failed to load notification count: $e');
+      debugPrint('[NotificationBell] Failed to load notification count: $e');
     }
   }
 

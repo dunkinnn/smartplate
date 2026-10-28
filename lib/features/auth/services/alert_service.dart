@@ -46,8 +46,9 @@ class AlertService {
         ),
       );
       _ready = true;
+    // Error: local notifications could not be set up (AlertService).
     } catch (e) {
-      debugPrint('Failed to set up notifications: $e');
+      debugPrint('[AlertService] Failed to set up notifications: $e');
     }
   }
 
@@ -102,8 +103,9 @@ class AlertService {
 
       await _scheduleReminders(now, {for (final r in logs) r['meal_type']});
       await _checkGoals(now, logs, profile);
+    // Error: meal reminders and goal alerts could not be updated (AlertService).
     } catch (e) {
-      debugPrint('Failed to update alerts: $e');
+      debugPrint('[AlertService] Failed to update alerts: $e');
     }
   }
 

@@ -87,7 +87,9 @@ class _NutritionalGoalsSettingsScreenState
         _activityLevel = row?['activity_level'] as String?;
         _isLoading = false;
       });
+    // Error: nutrition goals could not be loaded (Nutritional Goals Settings).
     } catch (e) {
+      debugPrint('[Nutritional Goals Settings] Failed to load goals: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -143,7 +145,9 @@ class _NutritionalGoalsSettingsScreenState
             : 'Goals saved.';
         _messageIsError = false;
       });
+    // Error: database rejected saving the nutrition goals (Nutritional Goals Settings).
     } on PostgrestException catch (e) {
+      debugPrint('[Nutritional Goals Settings] Failed to save goals: $e');
       if (!mounted) return;
       setState(() {
         _isSaving = false;

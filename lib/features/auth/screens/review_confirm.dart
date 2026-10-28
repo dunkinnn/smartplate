@@ -76,7 +76,9 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
           },
         );
       }
+    // Error: database rejected saving the new user profile (Review Confirm).
     } on PostgrestException catch (e) {
+      debugPrint('[Review Confirm] Database error saving profile: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -85,7 +87,9 @@ class _ReviewConfirmScreenState extends State<ReviewConfirmScreen> {
           ),
         );
       }
+    // Error: saving the new user profile failed (Review Confirm).
     } catch (e) {
+      debugPrint('[Review Confirm] Failed to save profile: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

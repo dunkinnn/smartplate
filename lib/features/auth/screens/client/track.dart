@@ -54,8 +54,9 @@ class _TrackScreenState extends State<TrackScreen> {
     try {
       final streak = await MealLogService.currentStreak();
       if (mounted) setState(() => _streak = streak);
+    // Error: streak could not be loaded from meal_logs (Track).
     } catch (e) {
-      debugPrint('Failed to load streak: $e');
+      debugPrint('[Track] Failed to load streak: $e');
     }
   }
 
@@ -128,8 +129,9 @@ class _TrackScreenState extends State<TrackScreen> {
         _macroGoals = profile ?? {};
         isLoading = false;
       });
+    // Error: the selected day's food logs could not be loaded (Track).
     } catch (e) {
-      debugPrint('Failed to load logs: $e');
+      debugPrint('[Track] Failed to load logs: $e');
       if (mounted) setState(() => isLoading = false);
     }
   }
@@ -178,8 +180,9 @@ class _TrackScreenState extends State<TrackScreen> {
       );
       await _loadDay(showSpinner: false);
       await _loadStreak();
+    // Error: marking a planned meal as eaten failed (Track).
     } catch (e) {
-      debugPrint('Failed to update planned meal: $e');
+      debugPrint('[Track] Failed to update planned meal: $e');
     }
 
     if (mounted) setState(() => _togglingMeal = null);
@@ -218,8 +221,9 @@ class _TrackScreenState extends State<TrackScreen> {
           .eq('id', item.id!);
       await _loadDay(showSpinner: false);
       AlertService.update();
+    // Error: deleting a logged food failed (Track).
     } catch (e) {
-      debugPrint('Failed to remove food: $e');
+      debugPrint('[Track] Failed to remove food: $e');
     }
   }
 

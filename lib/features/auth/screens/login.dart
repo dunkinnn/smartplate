@@ -111,11 +111,15 @@ class _LoginScreenState extends State<LoginScreen> {
           setState(() => _authError = 'Login failed');
         }
       }
+    // Error: Supabase Auth rejected the login, such as a wrong password (Login).
     } on AuthException catch (e) {
+      debugPrint('[Login] Login rejected: $e');
       if (mounted) {
         setState(() => _authError = friendlyError(e));
       }
+    // Error: login failed, likely a network problem (Login).
     } catch (e) {
+      debugPrint('[Login] Login failed: $e');
       if (mounted) {
         setState(() {
           _authError = friendlyError(e);

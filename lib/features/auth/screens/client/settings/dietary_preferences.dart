@@ -59,7 +59,9 @@ class _DietaryPreferencesScreenState extends State<DietaryPreferencesScreen> {
         );
         _isLoading = false;
       });
+    // Error: dietary preferences could not be loaded (Dietary Preferences).
     } catch (e) {
+      debugPrint('[Dietary Preferences] Failed to load preferences: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -101,7 +103,9 @@ class _DietaryPreferencesScreenState extends State<DietaryPreferencesScreen> {
             : 'Preferences saved.';
         _messageIsError = false;
       });
+    // Error: database rejected saving the dietary preferences (Dietary Preferences).
     } on PostgrestException catch (e) {
+      debugPrint('[Dietary Preferences] Failed to save preferences: $e');
       if (!mounted) return;
       setState(() {
         _isSaving = false;
