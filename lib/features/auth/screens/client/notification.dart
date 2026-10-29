@@ -51,7 +51,9 @@ Future<int> unreadNotificationCount() async {
       .eq('id', user.id)
       .maybeSingle();
   final prefs = await SharedPreferences.getInstance();
-  final read = (prefs.getStringList('notifications_read_$today') ?? []).toSet();
+  final read =
+      (prefs.getStringList('notifications_read_${user.id}_$today') ?? [])
+          .toSet();
 
   return _NotificationScreenState._buildNotifications(
     logs,
@@ -93,8 +95,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
         '${now.day.toString().padLeft(2, '0')}';
   }
 
-  // Read state is per day, so yesterday's keys do not silence today's alerts.
-  String get _readStorageKey => 'notifications_read_$_todayKey';
+  // Read state is per user and per day, so accounts on one phone do not share it.
+  String get _readStorageKey =>
+      'notifications_read_${Supabase.instance.client.auth.currentUser?.id}_$_todayKey';
 
   Future<void> _load() async {
     final supabase = Supabase.instance.client;

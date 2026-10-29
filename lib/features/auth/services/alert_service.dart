@@ -225,7 +225,9 @@ class AlertService {
     String body,
   ) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = 'alert_${type}_${_key(now)}';
+    // Per user, so one account's alert does not block another's on the same phone.
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    final key = 'alert_${userId}_${type}_${_key(now)}';
     if (prefs.getBool(key) ?? false) return;
     await prefs.setBool(key, true);
     await _plugin.show(
