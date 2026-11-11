@@ -11,6 +11,9 @@ const OPENAI_URL = 'https://api.openai.com/v1/responses';
 // Generations per user per Manila day; set the DAILY_LIMIT secret to 0 to turn it off.
 const DAILY_LIMIT = Number(Deno.env.get('DAILY_LIMIT') ?? 2);
 
+// Dishes the model suggests per meal; the first is picked, the rest are options.
+const OPTIONS_PER_MEAL = 3;
+
 // Single-meal swaps per user per Manila day, counted apart from full plans.
 const SWAP_LIMIT = Number(Deno.env.get('SWAP_LIMIT') ?? 5);
 
@@ -29,6 +32,8 @@ Rules:
 - Suggest real dishes common in Filipino homes, made with affordable ingredients from local markets and groceries.
 - Give realistic calorie, macro, sugar, fiber, saturated fat, sodium and cholesterol values for the quantities listed.
 - Respect every nutrition focus the user picked, for example lower sugar or sodium, or more protein or fiber.
+- Build each meal on the Pinggang Pinoy guide from the Philippine FNRI: about half the plate vegetables and fruits, with more vegetables than fruits; about a quarter rice or other energy foods such as root crops, corn or whole grains; about a quarter fish, lean meat, poultry, eggs, beans or tofu.
+- Prefer steamed, boiled, grilled, sauteed or soup dishes over deep-fried ones. Keep salt, soy sauce, fish sauce, sugar and processed meats such as hotdog, tocino, longganisa and canned meat low.
 - For each dish give 3 to 6 short cooking steps a home cook can follow with a stove and basic tools, and the total cooking time in minutes. Steps must only use the listed ingredients.
 - Never include an allergen or avoided food, not even as a minor ingredient, sauce or garnish.
 - Keep dish names short and friendly. Do not diagnose, give medical advice or make health claims.
@@ -92,7 +97,7 @@ function parseFoods(raw: unknown): { label: string; terms: string[] }[] {
     .map((label) => ({ label, terms: FOOD_TERMS[label] ?? [label] }));
 }
 
-// Rejects a plan if a listed food appears in any dish name or ingredient.
+// Finds a listed food in any dish name, ingredient or step.
 // Enforced here rather than trusting the prompt, because a model ignoring
 // an allergy is a safety problem, not a quality one.
 function findFoodViolation(
@@ -152,9 +157,15 @@ type MealSummary = Pick<PlanMeal, 'meal_type' | 'name' | 'kcal'>;
 // What a swap keeps from the current plan and the calories left for the new dish.
 interface SwapContext {
   meal: string;
-  current: string;
+  current: string[];
   others: MealSummary[];
   kcal: number;
+}
+
+// The picked dish for one meal plus the other options the user can switch to.
+interface MealChoice {
+  main: PlanMeal;
+  alternatives: PlanMeal[];
 }
 
 const NUTRIENT_FIELDS = [
@@ -228,14 +239,15 @@ function buildPrompt(
   swap?: SwapContext,
 ) {
   const requirements = swap
-    ? `- Exactly one dish, for ${swap.meal} only.
-- It must be different from the current ${swap.meal}: ${swap.current}.
+    ? `- Exactly ${OPTIONS_PER_MEAL} different dishes, all for ${swap.meal} only, best first.
+- They must be different from the current ${swap.meal} options: ${swap.current.join(', ')}.
 - The rest of the day stays: ${swap.others.map((o) => `${o.meal_type} ${o.name} (${o.kcal} kcal)`).join(', ')}.
-- Aim for about ${swap.kcal} kcal so the day stays within 10 percent of ${target}.`
-    : `- Exactly one dish for each of Breakfast, Lunch, Dinner.
-- Total calories within 10 percent of ${target}.`;
+- Aim for about ${swap.kcal} kcal each so the day stays within 10 percent of ${target}.`
+    : `- Exactly ${OPTIONS_PER_MEAL} different dishes for each of Breakfast, Lunch, Dinner, best first.
+- Dishes for the same meal have similar calories, so any one of them can be chosen.
+- The first dish of each meal must total within 10 percent of ${target} kcal.`;
 
-  return `Create ${swap ? `a new ${swap.meal} dish` : 'a one-day meal plan'} for this person.
+  return `Create ${swap ? `new ${swap.meal} options` : 'a one-day meal plan'} for this person.
 
 Person:
 - Age: ${profile.age ?? 'unknown'}, gender: ${profile.gender ?? 'unknown'}
@@ -340,11 +352,34 @@ function validate(meals: MealSummary[], target: number): string | null {
   return null;
 }
 
-// One meal_plan_items row, with values capped to what the table expects.
-function toItemRow(meal: PlanMeal, planId: string, i: number) {
+// Groups dishes by meal, drops unsafe ones, and keeps close alternatives to the first.
+function pickOptions(
+  dishes: PlanMeal[],
+  mealTypes: string[],
+  foods: { label: string; terms: string[] }[],
+): MealChoice[] | string {
+  const choices: MealChoice[] = [];
+
+  for (const type of mealTypes) {
+    const safe = dishes.filter((d) =>
+      d.meal_type === type && typeof d.name === 'string' && d.name &&
+      Number.isFinite(d.kcal) && d.kcal >= 0 && !findFoodViolation([d], foods)
+    );
+    if (safe.length === 0) return `No safe ${type} dish returned`;
+
+    const [main, ...rest] = safe;
+    // Options stay within 20 percent of the picked dish so switching keeps the day near target.
+    const alternatives = rest
+      .filter((d) => Math.abs(d.kcal - main.kcal) <= main.kcal * 0.2)
+      .slice(0, OPTIONS_PER_MEAL - 1);
+    choices.push({ main, alternatives });
+  }
+  return choices;
+}
+
+// The dish fields shared by a plan row and the options stored beside it, capped to the table limits.
+function toDish(meal: PlanMeal) {
   return {
-    plan_id: planId,
-    meal_type: meal.meal_type,
     name: meal.name,
     kcal: Math.round(meal.kcal),
     protein_g: meal.protein_g ?? 0,
@@ -357,6 +392,17 @@ function toItemRow(meal: PlanMeal, planId: string, i: number) {
     // Short, capped guide so a bad response cannot store a wall of text.
     steps: (meal.steps ?? []).slice(0, 8).map((st) => String(st).slice(0, 300)),
     cook_minutes: Math.max(0, Math.min(240, Math.round(meal.cook_minutes ?? 0))),
+  };
+}
+
+// One meal_plan_items row with its other options.
+function toItemRow(choice: MealChoice, planId: string, i: number) {
+  const meal = choice.main;
+  return {
+    plan_id: planId,
+    meal_type: meal.meal_type,
+    ...toDish(meal),
+    alternatives: choice.alternatives.map(toDish),
     sort_order: MEAL_TYPES.indexOf(meal.meal_type) >= 0
       ? MEAL_TYPES.indexOf(meal.meal_type)
       : i,
@@ -482,53 +528,55 @@ Deno.serve(async (req) => {
   if (swapMeal) {
     const { data: current, error: currentError } = await supabase
       .from('meal_plan_items')
-      .select('id, meal_type, name, kcal')
+      .select('id, meal_type, name, kcal, alternatives')
       .eq('plan_id', existing!.id);
     if (currentError) return json({ error: currentError.message }, 500);
 
-    const rows = (current ?? []) as (MealSummary & { id: string })[];
+    const rows = (current ?? []) as (MealSummary & {
+      id: string;
+      alternatives: { name: string }[] | null;
+    })[];
     const old = rows.find((r) => r.meal_type === swapMeal);
     if (!old) return json({ error: `No ${swapMeal} in this plan.` }, 400);
 
     const others = rows.filter((r) => r.meal_type !== swapMeal);
     const kept = others.reduce((sum, o) => sum + o.kcal, 0);
     oldItemId = old.id;
-    swap = { meal: swapMeal, current: old.name, others, kcal: Math.max(0, target - kept) };
+    swap = {
+      meal: swapMeal,
+      current: [old.name, ...(old.alternatives ?? []).map((a) => a.name)],
+      others,
+      kcal: Math.max(0, target - kept),
+    };
   }
 
   const prompt = buildPrompt(profile, recentNames, target, swap);
 
   // One retry: models occasionally return malformed JSON or ignore a rule.
-  let meals: PlanMeal[] | null = null;
+  let meals: MealChoice[] | null = null;
   let lastError = '';
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const response = await callOpenAI(apiKey, prompt);
-      // A swap keeps only the requested meal and checks the day with it in place.
-      const candidate = swap
-        ? response.filter((m) => m.meal_type === swapMeal).slice(0, 1)
-        : response;
-      if (swap && candidate.length === 0) {
-        lastError = `No ${swap.meal} dish returned`;
+      // Dishes with an allergen or avoided food are dropped, never stored as options.
+      const picked = pickOptions(
+        response,
+        swap ? [swap.meal] : MEAL_TYPES,
+        [...allergens, ...avoided],
+      );
+      if (typeof picked === 'string') {
+        lastError = picked;
         continue;
       }
-      const invalid = validate(swap ? [...swap.others, ...candidate] : candidate, target);
+      // A swap checks the day with the new dish in place of the old one.
+      const mains = picked.map((c) => c.main);
+      const invalid = validate(swap ? [...swap.others, ...mains] : mains, target);
       if (invalid) {
         lastError = invalid;
         continue;
       }
-      const violation = findFoodViolation(candidate, allergens);
-      if (violation) {
-        lastError = `Allergen check failed: ${violation}`;
-        continue;
-      }
-      const avoidedFood = findFoodViolation(candidate, avoided);
-      if (avoidedFood) {
-        lastError = `Avoided food check failed: ${avoidedFood}`;
-        continue;
-      }
-      meals = candidate;
+      meals = picked;
       break;
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
@@ -545,7 +593,7 @@ Deno.serve(async (req) => {
   if (swap) {
     const planId = existing!.id;
     const totalKcal = swap.others.reduce((sum, o) => sum + o.kcal, 0) +
-      Math.round(meals[0].kcal);
+      Math.round(meals[0].main.kcal);
 
     // New dish goes in before the old one is removed, so a failure never leaves a gap.
     const { error: insertError } = await supabase
@@ -568,7 +616,7 @@ Deno.serve(async (req) => {
     return json({ plan_id: planId, plan_date: planDate, total_kcal: totalKcal });
   }
 
-  const totalKcal = meals.reduce((sum, m) => sum + Math.round(m.kcal), 0);
+  const totalKcal = meals.reduce((sum, c) => sum + Math.round(c.main.kcal), 0);
 
   // Replace any existing plan for this date.
   const { data: plan, error: planError } = await supabase
@@ -599,7 +647,7 @@ Deno.serve(async (req) => {
 
   const { error: itemsError } = await supabase
     .from('meal_plan_items')
-    .insert(meals.map((meal, i) => toItemRow(meal, plan.id, i)));
+    .insert(meals.map((choice, i) => toItemRow(choice, plan.id, i)));
 
   if (itemsError) return json({ error: itemsError.message }, 500);
 

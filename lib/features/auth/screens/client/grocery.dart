@@ -6,13 +6,13 @@ import 'package:smart_plate/features/auth/widgets/glass_header.dart';
 import 'package:smart_plate/features/auth/widgets/meal_badge.dart';
 
 // --- MODEL ---
-// One ingredient on the week's list, backed by one grocery_items row per plan.
+// One ingredient on the week's list, backed by one grocery_items row per plan and meal.
 class GroceryItem {
   final List<String> ids;
   final String name;
   final String quantity;
   final String category;
-  final String mealType;
+  final List<String> meals;
   bool isBought;
 
   GroceryItem({
@@ -20,7 +20,7 @@ class GroceryItem {
     required this.name,
     required this.quantity,
     required this.category,
-    this.mealType = 'Other',
+    this.meals = const [],
     this.isBought = false,
   });
 }
@@ -193,20 +193,23 @@ class _GroceryScreenState extends State<GroceryScreen> {
       .eq('user_id', userId)
       .inFilter('plan_id', planIds);
 
-  // Combines the same ingredient from different days into one row.
+  // Combines the same ingredient from every meal and day into one row.
   List<GroceryItem> _merge(List<Map<String, dynamic>> rows) {
     final byName = <String, _Aggregate>{};
     final ids = <String, List<String>>{};
     final bought = <String, bool>{};
+    final meals = <String, Set<String>>{};
 
     for (final r in rows) {
       final name = (r['name'] as String? ?? '').trim();
-      final meal = r['meal_type'] as String? ?? 'Other';
-      final key = '$meal|${name.toLowerCase()}';
+      final key = name.toLowerCase();
       final agg = byName.putIfAbsent(
         key,
-        () => _Aggregate(name, r['category'] as String? ?? 'Pantry', meal),
+        () => _Aggregate(name, r['category'] as String? ?? 'Pantry'),
       );
+      meals
+          .putIfAbsent(key, () => {})
+          .add(r['meal_type'] as String? ?? 'Other');
       for (final part in (r['quantity'] as String? ?? '').split(' + ')) {
         agg.add(part);
       }
@@ -222,7 +225,10 @@ class _GroceryScreenState extends State<GroceryScreen> {
           name: e.value.name,
           quantity: e.value.formatted,
           category: e.value.category,
-          mealType: e.value.mealType,
+          meals: meals[e.key]!.toList()
+            ..sort(
+              (a, b) => _rank(mealOrder, a).compareTo(_rank(mealOrder, b)),
+            ),
           isBought: bought[e.key]!,
         ),
     ]..sort((a, b) => a.name.compareTo(b.name));
@@ -325,20 +331,24 @@ class _GroceryScreenState extends State<GroceryScreen> {
     }
   }
 
+  // Position in a fixed order, with unknown values last.
+  static int _rank(List<String> order, String value) {
+    final i = order.indexOf(value);
+    return i == -1 ? 99 : i;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Sections follow the meal each ingredient is for.
+    // Sections follow the ingredient category, so each ingredient shows once.
     final groupedItems = <String, List<GroceryItem>>{};
     for (final item in _items) {
-      groupedItems.putIfAbsent(item.mealType, () => []).add(item);
+      groupedItems.putIfAbsent(item.category, () => []).add(item);
     }
 
     final sortedCategories = groupedItems.keys.toList()
-      ..sort((a, b) {
-        final ai = mealOrder.indexOf(a);
-        final bi = mealOrder.indexOf(b);
-        return (ai == -1 ? 99 : ai).compareTo(bi == -1 ? 99 : bi);
-      });
+      ..sort(
+        (a, b) => _rank(categoryOrder, a).compareTo(_rank(categoryOrder, b)),
+      );
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -376,8 +386,10 @@ class _GroceryScreenState extends State<GroceryScreen> {
                       children: [
                         _buildDateHeader(),
                         ...sortedCategories.map(
-                          (meal) =>
-                              _buildMealSection(meal, groupedItems[meal]!),
+                          (category) => _buildCategorySection(
+                            category,
+                            groupedItems[category]!,
+                          ),
                         ),
                         const SizedBox(height: 24),
                         _buildFooter(),
@@ -621,11 +633,11 @@ class _GroceryScreenState extends State<GroceryScreen> {
     );
   }
 
-  // One card per meal: items still to buy first, bought ones folded underneath.
-  Widget _buildMealSection(String meal, List<GroceryItem> items) {
+  // One card per category: items still to buy first, bought ones folded underneath.
+  Widget _buildCategorySection(String category, List<GroceryItem> items) {
     final toBuy = items.where((i) => !i.isBought).toList();
     final bought = items.where((i) => i.isBought).toList();
-    final expanded = _showBought.contains(meal);
+    final expanded = _showBought.contains(category);
 
     return Container(
       margin: const EdgeInsets.only(top: 16),
@@ -640,11 +652,23 @@ class _GroceryScreenState extends State<GroceryScreen> {
         children: [
           Row(
             children: [
-              MealBadge(mealType: meal, size: 36),
+              Container(
+                height: 36,
+                width: 36,
+                decoration: BoxDecoration(
+                  color: brandGreen.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(
+                  _getCategoryIcon(category),
+                  color: brandGreen,
+                  size: 18,
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  meal,
+                  category,
                   style: const TextStyle(
                     fontWeight: FontWeight.w900,
                     color: darkBlue,
@@ -668,9 +692,9 @@ class _GroceryScreenState extends State<GroceryScreen> {
             InkWell(
               onTap: () => setState(() {
                 if (expanded) {
-                  _showBought.remove(meal);
+                  _showBought.remove(category);
                 } else {
-                  _showBought.add(meal);
+                  _showBought.add(category);
                 }
               }),
               borderRadius: BorderRadius.circular(12),
@@ -786,7 +810,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
     );
   }
 
-  // One ingredient: round check, name and amount, and a small category icon.
+  // One ingredient: round check, name and amount, and the meals that use it.
   Widget _buildGroceryTile(GroceryItem item) {
     final done = item.isBought;
 
@@ -835,15 +859,43 @@ class _GroceryScreenState extends State<GroceryScreen> {
                         color: textSecondary,
                       ),
                     ),
+                  if (item.meals.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        for (final meal in item.meals)
+                          _buildMealLabel(meal, done),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
-            Icon(
-              _getCategoryIcon(item.category),
-              color: done ? const Color(0xFFCBD5E1) : textSecondary,
-              size: 18,
-            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // Small tinted pill naming a meal, in that meal's color.
+  Widget _buildMealLabel(String meal, bool done) {
+    final (_, color) = mealStyle(meal);
+    final tint = done ? textSecondary : color;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        meal,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: tint,
         ),
       ),
     );
@@ -867,7 +919,7 @@ class _GroceryScreenState extends State<GroceryScreen> {
   }
 }
 
-// Collects one ingredient for one meal as it appears across several days.
+// Collects one ingredient's quantities as it appears across meals and days.
 class _Aggregate {
   final String name;
   final String category;

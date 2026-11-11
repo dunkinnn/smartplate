@@ -1264,7 +1264,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
             ],
           ),
           const SizedBox(height: 6),
-          for (final item in items)
+          for (final item in items) ...[
             InkWell(
               onTap: () => _showDishDetails(title, item),
               borderRadius: BorderRadius.circular(12),
@@ -1306,9 +1306,148 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                 ),
               ),
             ),
+            if (canSwap && _alternatives(item).isNotEmpty)
+              _buildOptionsLink(title, item),
+          ],
         ],
       ),
     );
+  }
+
+  // Other dish options stored with a planned meal.
+  List<Map<String, dynamic>> _alternatives(Map<String, dynamic> item) => [
+    for (final a in (item['alternatives'] as List?) ?? const [])
+      if (a is Map) Map<String, dynamic>.from(a),
+  ];
+
+  Widget _buildOptionsLink(String mealType, Map<String, dynamic> item) {
+    final count = _alternatives(item).length;
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: _isBusy ? null : () => _showOptions(mealType, item),
+        style: TextButton.styleFrom(
+          foregroundColor: brandGreen,
+          padding: const EdgeInsets.only(left: 40),
+          visualDensity: VisualDensity.compact,
+        ),
+        icon: const Icon(Icons.restaurant_menu_rounded, size: 16),
+        label: Text(
+          "$count other option${count == 1 ? '' : 's'}",
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+
+  // Lists the other options for a meal; picking one needs no AI call.
+  void _showOptions(String mealType, Map<String, dynamic> item) {
+    final options = _alternatives(item);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Choose your $mealType",
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: darkBlue,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "Current: ${item['name'] ?? ''}",
+                style: const TextStyle(fontSize: 13, color: textSecondary),
+              ),
+              const SizedBox(height: 12),
+              for (var i = 0; i < options.length; i++)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    options[i]['name'] as String? ?? '',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: textMain,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _optionSummary(options[i]),
+                    style: const TextStyle(fontSize: 12, color: textSecondary),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: textSecondary,
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _chooseOption(item, i);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _optionSummary(Map<String, dynamic> dish) {
+    final kcal = (dish['kcal'] as num?)?.round() ?? 0;
+    final minutes = (dish['cook_minutes'] as num?)?.round() ?? 0;
+    return minutes > 0 ? '$kcal kcal · $minutes min' : '$kcal kcal';
+  }
+
+  // Swaps in a stored option; the new row goes in before the old one is removed.
+  Future<void> _chooseOption(Map<String, dynamic> item, int index) async {
+    if (_isBusy) return;
+    final mealType = item['meal_type'] as String? ?? '';
+    final options = _alternatives(item);
+    final chosen = options.removeAt(index);
+    // The current dish becomes an option, with the same fields the chosen one has.
+    final current = {for (final key in chosen.keys) key: item[key]};
+
+    setState(() {
+      _swappingMeal = mealType;
+      _message = null;
+    });
+
+    final supabase = Supabase.instance.client;
+    try {
+      await supabase.from('meal_plan_items').insert({
+        'plan_id': item['plan_id'],
+        'meal_type': mealType,
+        'sort_order': item['sort_order'],
+        ...chosen,
+        'alternatives': [current, ...options],
+      });
+      await supabase.from('meal_plan_items').delete().eq('id', item['id']);
+
+      final change =
+          ((chosen['kcal'] as num?) ?? 0) - ((item['kcal'] as num?) ?? 0);
+      await supabase
+          .from('meal_plans')
+          .update({'total_kcal': totalKcal + change.round()})
+          .eq('id', item['plan_id']);
+
+      await _loadPlan();
+    // Error: switching to another dish option failed (Meal Plan).
+    } catch (e) {
+      debugPrint('[Meal Plan] Failed to choose $mealType option: $e');
+      if (mounted) setState(() => _message = friendlyError(e));
+    }
+
+    if (mounted) setState(() => _swappingMeal = null);
   }
 
   Widget _buildSwapButton(String mealType) {
