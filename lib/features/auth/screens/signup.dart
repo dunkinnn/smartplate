@@ -4,6 +4,7 @@ import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'login.dart';
 import 'profile.dart';
 import 'legal.dart';
+import 'package:smart_plate/features/auth/widgets/google_button.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -320,6 +321,10 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                           ),
                   ),
+                ),
+
+                GoogleButton(
+                  onError: (message) => setState(() => _emailError = message),
                 ),
 
                 const SizedBox(height: 20),

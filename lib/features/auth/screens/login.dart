@@ -5,6 +5,7 @@ import 'package:smart_plate/features/auth/services/friendly_error.dart';
 import 'signup.dart';
 import 'forgot_password.dart';
 import 'package:smart_plate/features/auth/screens/client/dashboard.dart';
+import 'package:smart_plate/features/auth/widgets/google_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -321,6 +322,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                 ),
+              ),
+
+              GoogleButton(
+                onError: (message) => setState(() => _authError = message),
               ),
 
               const SizedBox(height: 20),

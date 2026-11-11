@@ -5,6 +5,7 @@ import 'features/auth/screens/login.dart';
 import 'features/auth/screens/client/dashboard.dart';
 import 'features/auth/screens/splash.dart';
 import 'features/auth/services/alert_service.dart';
+import 'features/auth/services/google_auth.dart';
 import 'features/auth/widgets/connection_banner.dart';
 
 Future<void> main() async {
@@ -15,6 +16,8 @@ Future<void> main() async {
     publishableKey:
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2YWdnYWtmcW5tcW1ld2l6aXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTk3NzAsImV4cCI6MjA5NzQ3NTc3MH0.W9EkdJ_kG81Yfeq63wGFDSxlui8giGLL7jdQV9oZHmk',
   );
+
+  await initGoogleSignIn();
 
   // Prepares phone notifications for meal reminders and goal alerts.
   await AlertService.init();

@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:smart_plate/features/auth/services/alert_service.dart';
+import 'package:smart_plate/features/auth/services/google_auth.dart';
 import 'package:smart_plate/features/auth/services/meal_log_service.dart';
 import 'package:smart_plate/features/auth/widgets/meal_badge.dart';
 import 'package:smart_plate/features/auth/services/friendly_error.dart';
@@ -62,6 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       // Reminders belong to this account, so clear them on logout.
       await AlertService.cancelAll();
+      await signOutOfGoogle();
       await _supabase.auth.signOut();
       if (!mounted) return;
 
