@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:smart_plate/features/auth/services/friendly_error.dart';
@@ -39,12 +40,15 @@ class _GoogleButtonState extends State<GoogleButton> {
     } on GoogleSignInException catch (e) {
       debugPrint('[Google Sign-In] Google sign-in stopped: $e');
       if (e.code != GoogleSignInExceptionCode.canceled) {
-        widget.onError('Google sign-in failed. Please try again.');
+        widget.onError(
+          kDebugMode ? 'Google: $e' : 'Google sign-in failed. Please try again.',
+        );
       }
     // Error: Supabase rejected the Google token or the network failed (Google Sign-In).
     } catch (e) {
       debugPrint('[Google Sign-In] Failed to sign in: $e');
-      widget.onError(friendlyError(e));
+      // Debug builds show the raw error so setup problems are easy to spot.
+      widget.onError(kDebugMode ? 'Google: $e' : friendlyError(e));
     }
 
     if (mounted) setState(() => _isLoading = false);
