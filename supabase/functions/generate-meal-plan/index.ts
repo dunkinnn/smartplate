@@ -1,4 +1,4 @@
-// Generates a day's meal plan for the signed-in user and saves it.
+// Generates a day's meal plan for the signed-in user and saves it, or swaps one meal in it.
 // Deploy: supabase functions deploy generate-meal-plan
 // Secret:  supabase secrets set OPENAI_API_KEY=...
 
@@ -10,6 +10,9 @@ const OPENAI_URL = 'https://api.openai.com/v1/responses';
 
 // Generations per user per Manila day; set the DAILY_LIMIT secret to 0 to turn it off.
 const DAILY_LIMIT = Number(Deno.env.get('DAILY_LIMIT') ?? 2);
+
+// Single-meal swaps per user per Manila day, counted apart from full plans.
+const SWAP_LIMIT = Number(Deno.env.get('SWAP_LIMIT') ?? 5);
 
 // Provider rejected the request outright, so retrying will not help.
 class ModelUnavailable extends Error {}
@@ -144,6 +147,16 @@ interface PlanMeal {
   cook_minutes: number;
 }
 
+type MealSummary = Pick<PlanMeal, 'meal_type' | 'name' | 'kcal'>;
+
+// What a swap keeps from the current plan and the calories left for the new dish.
+interface SwapContext {
+  meal: string;
+  current: string;
+  others: MealSummary[];
+  kcal: number;
+}
+
 const NUTRIENT_FIELDS = [
   'sugar_g',
   'fiber_g',
@@ -212,8 +225,17 @@ function buildPrompt(
   profile: Record<string, unknown>,
   recent: string[],
   target: number,
+  swap?: SwapContext,
 ) {
-  return `Create a one-day meal plan for this person.
+  const requirements = swap
+    ? `- Exactly one dish, for ${swap.meal} only.
+- It must be different from the current ${swap.meal}: ${swap.current}.
+- The rest of the day stays: ${swap.others.map((o) => `${o.meal_type} ${o.name} (${o.kcal} kcal)`).join(', ')}.
+- Aim for about ${swap.kcal} kcal so the day stays within 10 percent of ${target}.`
+    : `- Exactly one dish for each of Breakfast, Lunch, Dinner.
+- Total calories within 10 percent of ${target}.`;
+
+  return `Create ${swap ? `a new ${swap.meal} dish` : 'a one-day meal plan'} for this person.
 
 Person:
 - Age: ${profile.age ?? 'unknown'}, gender: ${profile.gender ?? 'unknown'}
@@ -231,8 +253,7 @@ Person:
 ${recent.length ? `Do not repeat these recent dishes: ${recent.join(', ')}.` : ''}
 
 Requirements:
-- Exactly one dish for each of Breakfast, Lunch, Dinner.
-- Total calories within 10 percent of ${target}.`;
+${requirements}`;
 }
 
 interface ResponsesResult {
@@ -296,7 +317,7 @@ async function callOpenAI(apiKey: string, prompt: string): Promise<PlanMeal[]> {
 }
 
 // Rejects anything that would violate the table constraints downstream.
-function validate(meals: PlanMeal[], target: number): string | null {
+function validate(meals: MealSummary[], target: number): string | null {
   if (meals.length < 3) return 'Plan has fewer than three meals';
 
   for (const meal of meals) {
@@ -317,6 +338,29 @@ function validate(meals: PlanMeal[], target: number): string | null {
     return `Plan total ${Math.round(total)} kcal is not within 10 percent of ${target}`;
   }
   return null;
+}
+
+// One meal_plan_items row, with values capped to what the table expects.
+function toItemRow(meal: PlanMeal, planId: string, i: number) {
+  return {
+    plan_id: planId,
+    meal_type: meal.meal_type,
+    name: meal.name,
+    kcal: Math.round(meal.kcal),
+    protein_g: meal.protein_g ?? 0,
+    carbs_g: meal.carbs_g ?? 0,
+    fat_g: meal.fat_g ?? 0,
+    ...Object.fromEntries(
+      NUTRIENT_FIELDS.map((f) => [f, Math.max(0, meal[f] ?? 0)]),
+    ),
+    ingredients: meal.ingredients ?? [],
+    // Short, capped guide so a bad response cannot store a wall of text.
+    steps: (meal.steps ?? []).slice(0, 8).map((st) => String(st).slice(0, 300)),
+    cook_minutes: Math.max(0, Math.min(240, Math.round(meal.cook_minutes ?? 0))),
+    sort_order: MEAL_TYPES.indexOf(meal.meal_type) >= 0
+      ? MEAL_TYPES.indexOf(meal.meal_type)
+      : i,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -344,11 +388,17 @@ Deno.serve(async (req) => {
   const manilaDay = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
 
   let planDate: string;
+  let swapMeal: string | null = null;
   try {
     const body = await req.json();
     planDate = String(body?.plan_date ?? manilaDay);
+    if (body?.swap_meal != null) swapMeal = String(body.swap_meal);
   } catch {
     planDate = manilaDay;
+  }
+
+  if (swapMeal && !MEAL_TYPES.includes(swapMeal)) {
+    return json({ error: 'Unknown meal to swap.' }, 400);
   }
 
   // Plans can only be generated for today, matching the app.
@@ -370,7 +420,7 @@ Deno.serve(async (req) => {
   // A saved plan is final, so regenerating it is refused before any spend.
   const { data: existing, error: existingError } = await supabase
     .from('meal_plans')
-    .select('saved_at')
+    .select('id, saved_at')
     .eq('user_id', user.id)
     .eq('plan_date', planDate)
     .maybeSingle();
@@ -380,19 +430,29 @@ Deno.serve(async (req) => {
     return json({ error: 'This plan is already saved.' }, 409);
   }
 
+  // A swap edits today's unsaved plan, so one must exist first.
+  if (swapMeal && !existing) {
+    return json({ error: 'Generate a plan before swapping a meal.' }, 400);
+  }
+
+  const feature = swapMeal ? 'meal_swap' : 'meal_plan';
+  const limit = swapMeal ? SWAP_LIMIT : DAILY_LIMIT;
+
   // The daily cap counts attempts since the start of today in Manila.
   const { count, error: usageError } = await supabase
     .from('ai_usage')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', user.id)
-    // Only plan generations count, so food estimates never use up this limit.
-    .eq('feature', 'meal_plan')
+    // Plans and swaps have separate limits, and food estimates never count.
+    .eq('feature', feature)
     .gte('created_at', `${manilaDay}T00:00:00+08:00`);
 
   if (usageError) return json({ error: usageError.message }, 500);
-  if (DAILY_LIMIT > 0 && (count ?? 0) >= DAILY_LIMIT) {
+  if (limit > 0 && (count ?? 0) >= limit) {
+    const what = swapMeal ? 'swap' : 'generate';
+    const unit = swapMeal ? 'meals' : 'plans';
     return json(
-      { error: `Daily limit reached. You can generate ${DAILY_LIMIT} plans per day.` },
+      { error: `Daily limit reached. You can ${what} ${limit} ${unit} per day.` },
       429,
     );
   }
@@ -400,7 +460,7 @@ Deno.serve(async (req) => {
   // Logged before the model call so failed attempts still count toward spend.
   const { error: logError } = await supabase
     .from('ai_usage')
-    .insert({ user_id: user.id, feature: 'meal_plan', model: MODEL });
+    .insert({ user_id: user.id, feature, model: MODEL });
   if (logError) return json({ error: logError.message }, 500);
 
   // Recent dish names, so the model does not repeat itself all week.
@@ -415,7 +475,28 @@ Deno.serve(async (req) => {
   const allergens = parseFoods(profile.allergen);
   const avoided = parseFoods(profile.food_restriction);
   const target = Number(profile.calorie_target) || 2000;
-  const prompt = buildPrompt(profile, recentNames, target);
+
+  // For a swap, the other meals stay and the new dish fills the calorie gap.
+  let swap: SwapContext | undefined;
+  let oldItemId: string | undefined;
+  if (swapMeal) {
+    const { data: current, error: currentError } = await supabase
+      .from('meal_plan_items')
+      .select('id, meal_type, name, kcal')
+      .eq('plan_id', existing!.id);
+    if (currentError) return json({ error: currentError.message }, 500);
+
+    const rows = (current ?? []) as (MealSummary & { id: string })[];
+    const old = rows.find((r) => r.meal_type === swapMeal);
+    if (!old) return json({ error: `No ${swapMeal} in this plan.` }, 400);
+
+    const others = rows.filter((r) => r.meal_type !== swapMeal);
+    const kept = others.reduce((sum, o) => sum + o.kcal, 0);
+    oldItemId = old.id;
+    swap = { meal: swapMeal, current: old.name, others, kcal: Math.max(0, target - kept) };
+  }
+
+  const prompt = buildPrompt(profile, recentNames, target, swap);
 
   // One retry: models occasionally return malformed JSON or ignore a rule.
   let meals: PlanMeal[] | null = null;
@@ -423,8 +504,16 @@ Deno.serve(async (req) => {
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const candidate = await callOpenAI(apiKey, prompt);
-      const invalid = validate(candidate, target);
+      const response = await callOpenAI(apiKey, prompt);
+      // A swap keeps only the requested meal and checks the day with it in place.
+      const candidate = swap
+        ? response.filter((m) => m.meal_type === swapMeal).slice(0, 1)
+        : response;
+      if (swap && candidate.length === 0) {
+        lastError = `No ${swap.meal} dish returned`;
+        continue;
+      }
+      const invalid = validate(swap ? [...swap.others, ...candidate] : candidate, target);
       if (invalid) {
         lastError = invalid;
         continue;
@@ -449,7 +538,34 @@ Deno.serve(async (req) => {
   }
 
   if (!meals) {
-    return json({ error: `Could not generate a plan. ${lastError}` }, 502);
+    const what = swap ? `swap ${swap.meal}` : 'generate a plan';
+    return json({ error: `Could not ${what}. ${lastError}` }, 502);
+  }
+
+  if (swap) {
+    const planId = existing!.id;
+    const totalKcal = swap.others.reduce((sum, o) => sum + o.kcal, 0) +
+      Math.round(meals[0].kcal);
+
+    // New dish goes in before the old one is removed, so a failure never leaves a gap.
+    const { error: insertError } = await supabase
+      .from('meal_plan_items')
+      .insert(toItemRow(meals[0], planId, 0));
+    if (insertError) return json({ error: insertError.message }, 500);
+
+    const { error: removeError } = await supabase
+      .from('meal_plan_items')
+      .delete()
+      .eq('id', oldItemId!);
+    if (removeError) return json({ error: removeError.message }, 500);
+
+    const { error: totalError } = await supabase
+      .from('meal_plans')
+      .update({ total_kcal: totalKcal })
+      .eq('id', planId);
+    if (totalError) return json({ error: totalError.message }, 500);
+
+    return json({ plan_id: planId, plan_date: planDate, total_kcal: totalKcal });
   }
 
   const totalKcal = meals.reduce((sum, m) => sum + Math.round(m.kcal), 0);
@@ -481,27 +597,9 @@ Deno.serve(async (req) => {
     .eq('plan_id', plan.id);
   if (groceryError) return json({ error: groceryError.message }, 500);
 
-  const { error: itemsError } = await supabase.from('meal_plan_items').insert(
-    meals.map((meal, i) => ({
-      plan_id: plan.id,
-      meal_type: meal.meal_type,
-      name: meal.name,
-      kcal: Math.round(meal.kcal),
-      protein_g: meal.protein_g ?? 0,
-      carbs_g: meal.carbs_g ?? 0,
-      fat_g: meal.fat_g ?? 0,
-      ...Object.fromEntries(
-        NUTRIENT_FIELDS.map((f) => [f, Math.max(0, meal[f] ?? 0)]),
-      ),
-      ingredients: meal.ingredients ?? [],
-      // Short, capped guide so a bad response cannot store a wall of text.
-      steps: (meal.steps ?? []).slice(0, 8).map((st) => String(st).slice(0, 300)),
-      cook_minutes: Math.max(0, Math.min(240, Math.round(meal.cook_minutes ?? 0))),
-      sort_order: MEAL_TYPES.indexOf(meal.meal_type) >= 0
-        ? MEAL_TYPES.indexOf(meal.meal_type)
-        : i,
-    })),
-  );
+  const { error: itemsError } = await supabase
+    .from('meal_plan_items')
+    .insert(meals.map((meal, i) => toItemRow(meal, plan.id, i)));
 
   if (itemsError) return json({ error: itemsError.message }, 500);
 

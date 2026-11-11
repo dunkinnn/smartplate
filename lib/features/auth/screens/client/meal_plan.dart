@@ -43,6 +43,11 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
   bool isSaved = false;
   bool isSaving = false;
 
+  // Meal being swapped, so only its card shows a spinner.
+  String? _swappingMeal;
+
+  bool get _isBusy => isGenerating || isSaving || _swappingMeal != null;
+
   bool get _isToday => _dateKey(selectedDate) == _dateKey(DateTime.now());
 
   // Sugar, fiber and the rest stay folded until the user asks for them.
@@ -184,6 +189,35 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     }
 
     if (mounted) setState(() => isGenerating = false);
+  }
+
+  // Asks the AI for a new dish for one meal and keeps the rest of the plan.
+  Future<void> _swapMeal(String mealType) async {
+    if (_isBusy) return;
+    setState(() {
+      _swappingMeal = mealType;
+      _message = null;
+    });
+
+    try {
+      final response = await Supabase.instance.client.functions.invoke(
+        'generate-meal-plan',
+        body: {'plan_date': _dateKey(selectedDate), 'swap_meal': mealType},
+      );
+
+      final data = response.data;
+      if (data is Map && data['error'] != null) {
+        throw Exception(data['error']);
+      }
+
+      await _loadPlan();
+    // Error: swapping one meal failed in the generate-meal-plan function (Meal Plan).
+    } catch (e) {
+      debugPrint('[Meal Plan] Failed to swap $mealType: $e');
+      if (mounted) setState(() => _message = friendlyError(e));
+    }
+
+    if (mounted) setState(() => _swappingMeal = null);
   }
 
   // Confirms the plan for the day; eating is recorded in Track.
@@ -574,7 +608,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
   }
 
   Widget _buildSaveButton() {
-    final busy = isSaving || isGenerating;
+    final busy = _isBusy;
 
     return SizedBox(
       height: 50,
@@ -615,7 +649,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
       width: double.infinity,
       height: 50,
       child: OutlinedButton.icon(
-        onPressed: isGenerating || isSaving ? null : _generatePlan,
+        onPressed: _isBusy ? null : _generatePlan,
         icon: isGenerating
             ? const SizedBox(
                 height: 16,
@@ -1188,6 +1222,8 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
       0,
       (sum, i) => sum + ((i['kcal'] as num?)?.round() ?? 0),
     );
+    // Only today's unconfirmed plan can change, and snacks are never generated.
+    final canSwap = _isToday && !isSaved && title != 'Snack';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1213,6 +1249,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                   ),
                 ),
               ),
+              if (canSwap) _buildSwapButton(title),
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: Text(
@@ -1271,6 +1308,25 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSwapButton(String mealType) {
+    if (_swappingMeal == mealType) {
+      return const Padding(
+        padding: EdgeInsets.all(12),
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2, color: brandGreen),
+        ),
+      );
+    }
+    return IconButton(
+      tooltip: 'Swap $mealType',
+      onPressed: _isBusy ? null : () => _swapMeal(mealType),
+      icon: const Icon(Icons.swap_horiz_rounded, size: 22),
+      color: brandGreen,
     );
   }
 }
